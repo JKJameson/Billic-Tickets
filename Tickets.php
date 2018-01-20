@@ -5,167 +5,149 @@ class Tickets {
 		'admin_menu_name' => 'Tickets',
 		'description' => 'Provide support to your users.',
 		'admin_menu_icon' => '<i class="icon-ticket"></i>',
-		'permissions' => array('Tickets_New', 'Tickets_Close'),
-		
+		'permissions' => array(
+			'Tickets_New',
+			'Tickets_Close'
+		) ,
 		'user_menu_name' => 'My Tickets',
 		'user_menu_icon' => '<i class="icon-ticket"></i>',
-		
 		'allowed_tags' => '<p><a><strong><u><blockquote><ul><ol><li><h2><h3><s><em><img><br>',
 	);
 	function show_messages($ticket, $area) { // $area = admin OR client
 		global $db, $billic;
-		
 		$show_santa_hat = false;
-		if (date('n')=='12' && date('j')>7 && get_config('Tickets_christmas')==1) {
+		if (date('n') == '12' && date('j') > 7 && get_config('Tickets_christmas') == 1) {
 			$show_santa_hat = true;
 		}
-
 		// get all ticket replies
 		$messages = $db->q('SELECT * FROM `ticketmessages` WHERE `tid` = ? ORDER BY `date` ASC', $_GET['ID']);
-
 		// mark as read
-		if ($ticket[$area.'unread']==1) {
-			$db->q('UPDATE `tickets` SET `'.$area.'unread` = \'0\' WHERE `id` = ?', $_GET['ID']);
+		if ($ticket[$area . 'unread'] == 1) {
+			$db->q('UPDATE `tickets` SET `' . $area . 'unread` = \'0\' WHERE `id` = ?', $_GET['ID']);
 		}
-
-		foreach($messages as $message) {
-            if ($message['userid']==$billic->user['id']) {
-                $user_row = $billic->user;
-            } else {
-                $user_row = $db->q('SELECT `id`, `firstname`, `lastname`, `email`, `permissions` FROM `users` WHERE `id` = ?', $message['userid']);
-                $user_row = $user_row[0];
-            }
-
+		foreach ($messages as $message) {
+			if ($message['userid'] == $billic->user['id']) {
+				$user_row = $billic->user;
+			} else {
+				$user_row = $db->q('SELECT `id`, `firstname`, `lastname`, `email`, `permissions` FROM `users` WHERE `id` = ?', $message['userid']);
+				$user_row = $user_row[0];
+			}
 			$name_line = '';
 			$email = '';
 			echo '<table class="table table-striped"><tr><td rowspan="2" width="15%" class="ticketview-left">';
-            if ($message['userid']!=0) {
-                if ($area=='admin' && $user_row['id']==$ticket['userid']) {
-                    $name_line .= '<a href="/Admin/Users/ID/'.$message['userid'].'/">';
-                }
-                $name_line .= safe(wordwrap($user_row['firstname'].' '.$user_row['lastname'], 16, PHP_EOL, true)).'<br>';
-                if ($area=='admin' && $user_row['id']==$ticket['userid']) {
-                    $name_line .= '</a>';
-                }
-                $email = $user_row['email'];
-            } else
-                if (!empty($message['name'])) {
-                    $name_line .= safe(wordwrap($message['name'], 16, PHP_EOL, true)).'<br>';
-                }
-            if (!empty($message['email'])) {
-                $name_line .= '<sup>';
-                if (strlen($message['email'])<=16) {
-                    $name_line .= safe($message['email']);
-                } else {
-                    $name_line .= '<span title="'.safe($message['email']).'">'.safe(substr($message['email'], 0, 16)).'...</span>';
-                }
-                $name_line .= '</sup>';
-                $email = $message['email'];
-            }
-            if (!empty($email)) {
-				
+			if ($message['userid'] != 0) {
+				if ($area == 'admin' && $user_row['id'] == $ticket['userid']) {
+					$name_line.= '<a href="/Admin/Users/ID/' . $message['userid'] . '/">';
+				}
+				$name_line.= safe(wordwrap($user_row['firstname'] . ' ' . $user_row['lastname'], 16, PHP_EOL, true)) . '<br>';
+				if ($area == 'admin' && $user_row['id'] == $ticket['userid']) {
+					$name_line.= '</a>';
+				}
+				$email = $user_row['email'];
+			} else if (!empty($message['name'])) {
+				$name_line.= safe(wordwrap($message['name'], 16, PHP_EOL, true)) . '<br>';
+			}
+			if (!empty($message['email'])) {
+				$name_line.= '<sup>';
+				if (strlen($message['email']) <= 16) {
+					$name_line.= safe($message['email']);
+				} else {
+					$name_line.= '<span title="' . safe($message['email']) . '">' . safe(substr($message['email'], 0, 16)) . '...</span>';
+				}
+				$name_line.= '</sup>';
+				$email = $message['email'];
+			}
+			if (!empty($email)) {
 				// START Santa Hat
 				if ($show_santa_hat) {
 					echo '<div style="position:relative;width:100px;height:100px;margin-left:auto;margin-right:auto;margin-top: 40px"><img src="/Modules/Tickets/santa-hat.png" style="position:absolute;bottom:70px;right:16px">';
 				}
-				
-                echo '<img src="'.$billic->avatar($email, 100).'" width="100" height="100" class="img-circle">';
-				
+				echo '<img src="' . $billic->avatar($email, 100) . '" width="100" height="100" class="img-circle">';
 				// STOP Santa Hat
 				if ($show_santa_hat) {
 					echo '</div>';
 				}
-				
-            }
-			echo '<br>'.$name_line;
+			}
+			echo '<br>' . $name_line;
 			if ($billic->user_has_permission($user_row, 'admin')) {
 				echo '<span class="label label-primary">Staff</span>';
 			} else {
-				echo '<span class="label label-default">User</span>';	
+				echo '<span class="label label-default">User</span>';
 			}
-			echo '</td><td class="ticketview-top">'.$billic->time_ago($message['date']).' ago<span class="pull-right">'.date(DATE_RFC2822, $message['date']).'</span></th></tr>';
+			echo '</td><td class="ticketview-top">' . $billic->time_ago($message['date']) . ' ago<span class="pull-right">' . date(DATE_RFC2822, $message['date']) . '</span></th></tr>';
 			echo '<tr><td class="ticketview-bottom">';
 			if (!empty($message['attachments'])) {
 				$attachments = explode('|', $message['attachments']);
 				echo '<div style="float:right;text-align:center">';
-				foreach($attachments as $attachment) {
-					echo '<a href="/User/Tickets/Download/'.urlencode($attachment).'" target="_blank"><img src="/User/Tickets/Download/'.urlencode($attachment).'/Thumbnail/120"><br>'.urlencode($attachment).'</a><br>';
+				foreach ($attachments as $attachment) {
+					echo '<a href="/User/Tickets/Download/' . urlencode($attachment) . '" target="_blank"><img src="/User/Tickets/Download/' . urlencode($attachment) . '/Thumbnail/120"><br>' . urlencode($attachment) . '</a><br>';
 				}
 				echo '</div>';
 			}
 			$msg = $message['message'];
-			if ($message['date']<1434415726) {
+			if ($message['date'] < 1434415726) {
 				$msg = htmlentities($msg, ENT_QUOTES, 'UTF-8');
 				$msg = nl2br($msg);
 			}
-			
 			// if there is no html then convert new lines to line breaks
-			if (stripos($msg, '<br>')===false) {
-				$msg = str_replace(PHP_EOL, '<br>', $msg);	
+			if (stripos($msg, '<br>') === false) {
+				$msg = str_replace(PHP_EOL, '<br>', $msg);
 			}
-			
 			//$msg = preg_replace('#http(s?)://(.*?)([\s<])#', '<a href="http$1://$2" target="_blank">http$1://$2</a>$3', $msg);
 			echo $msg;
 			echo '</td></tr></table>';
 		}
 	}
-	
 	function check_reply($ticket) {
 		global $billic, $db;
 		$billic->disable_content();
 		$drafts = $db->q('SELECT `userid`, `timestamp` FROM `tickets_draft` WHERE `ticketid` = ? AND `userid` != ?', $ticket['id'], $billic->user['id']);
 		$num = count($drafts);
-		if ($num==1) {
+		if ($num == 1) {
 			$message = 'The user ';
-		} else
-			if ($num>1) {
+		} else if ($num > 1) {
 			$message = 'The following users were replying to this ticket;<br>';
 		}
-		foreach($drafts as $draft) {
+		foreach ($drafts as $draft) {
 			$user = $db->q('SELECT `firstname`, `lastname` FROM `users` WHERE `id` = ?', $draft['userid']);
 			$user = $user[0];
 			if (empty($user)) {
-				continue;	
+				continue;
 			}
-			$message .= $user['firstname'].' '.$user['lastname'].' ';
-			if ($num==1) {
-				$message .= ' was writing a reply to this ticket at '.date('jS M Y H:i', $draft['timestamp']);
+			$message.= $user['firstname'] . ' ' . $user['lastname'] . ' ';
+			if ($num == 1) {
+				$message.= ' was writing a reply to this ticket at ' . date('jS M Y H:i', $draft['timestamp']);
 			} else {
-				$message .= ' at '.date('jS M Y H:i', $draft['timestamp']).'<br>';
+				$message.= ' at ' . date('jS M Y H:i', $draft['timestamp']) . '<br>';
 			}
 		}
 		echo json_encode(array(
-			'count' => count($drafts),
+			'count' => count($drafts) ,
 			'message' => $message,
 		));
 		exit;
 	}
-	
 	function admin_area() {
 		global $billic, $db;
 		if (isset($_GET['ID'])) {
 			$ticket = $db->q('SELECT * FROM `tickets` WHERE `id` = ?', $_GET['ID']);
 			$ticket = $ticket[0];
 			if (empty($ticket)) {
-				err('Ticket '.$_GET['ID'].' does not exist');
+				err('Ticket ' . $_GET['ID'] . ' does not exist');
 			}
-			
-			if ($_GET['Action']=='SaveDraft') {
+			if ($_GET['Action'] == 'SaveDraft') {
 				$billic->disable_content();
 				$this->save_draft($ticket['id'], $_POST['message']);
 				exit;
 			}
-			
-			if ($_GET['Action']=='CheckReply') {
+			if ($_GET['Action'] == 'CheckReply') {
 				$this->check_reply($ticket);
 			}
-
 			if (empty($ticket['replypassword'])) {
 				$ticket['replypassword'] = $billic->rand_str(30);
 				$db->q('UPDATE `tickets` SET `replypassword` = ? WHERE `id` = ?', $ticket['replypassword'], $ticket['id']);
 			}
-
-			if ($_GET['Action']=='Close') {
+			if ($_GET['Action'] == 'Close') {
 				if (!$billic->user_has_permission($billic->user, 'Tickets_Close')) {
 					err('You do not have permission to close this ticket');
 				}
@@ -173,59 +155,56 @@ class Tickets {
 				$user_row = $db->q('SELECT `firstname`, `lastname`, `email` FROM `users` WHERE `id` = ?', $ticket['userid']);
 				$user_row = $user_row[0];
 				if (!empty($user_row['email'])) {
-					$billic->email($user_row['email'], 'Ticket #'.$ticket['id'].' Closed - '.safe($ticket['title']), 'Dear '.$user_row['firstname'].' '.$user_row['lastname'].',<br>This ticket has been closed. Please reply to the ticket if you have anything further to discuss.<br><br><hr><br><a href="http'.(get_config('billic_ssl')==1?'s':'').'://'.get_config('billic_domain').'/User/Tickets/ID/'.$ticket['id'].'/">http'.(get_config('billic_ssl')==1?'s':'').'://'.get_config('billic_domain').'/User/Tickets/ID/'.$ticket['id'].'/</a><br>'.$ticket['replypassword']);
+					$billic->email($user_row['email'], 'Ticket #' . $ticket['id'] . ' Closed - ' . safe($ticket['title']) , 'Dear ' . $user_row['firstname'] . ' ' . $user_row['lastname'] . ',<br>This ticket has been closed. Please reply to the ticket if you have anything further to discuss.<br><br><hr><br><a href="http' . (get_config('billic_ssl') == 1 ? 's' : '') . '://' . get_config('billic_domain') . '/User/Tickets/ID/' . $ticket['id'] . '/">http' . (get_config('billic_ssl') == 1 ? 's' : '') . '://' . get_config('billic_domain') . '/User/Tickets/ID/' . $ticket['id'] . '/</a><br>' . $ticket['replypassword']);
 					$billic->redirect('/Admin/Tickets/');
 				}
 			}
-
 			if (isset($_GET['Verify']) && $billic->user_has_permission($billic->user, 'Users_Verify')) {
-				if ($_GET['Verify']==0||$_GET['Verify']==1) {
+				if ($_GET['Verify'] == 0 || $_GET['Verify'] == 1) {
 					$db->q('UPDATE `users` SET `verified` = ? WHERE `id` = ?', $_GET['Verify'], $ticket['userid']);
 					$attachments = explode('|', $ticket['attachments']);
-					foreach($attachments as $attachment) {
+					foreach ($attachments as $attachment) {
 						if (empty($attachment)) {
 							continue;
 						}
-						@unlink('../attachments/'.$attachment);
-						if (file_exists('../attachments/'.$attachment)) {
-							err('Failed to delete '.$attachment);
+						@unlink('../attachments/' . $attachment);
+						if (file_exists('../attachments/' . $attachment)) {
+							err('Failed to delete ' . $attachment);
 						}
 					}
 					$replies = $db->q('SELECT * FROM `ticketmessages` WHERE `tid` = ?', $ticket['id']);
-					foreach($replies as $reply) {
+					foreach ($replies as $reply) {
 						$attachments = explode('|', $ticket['attachments']);
-						foreach($attachments as $attachment) {
+						foreach ($attachments as $attachment) {
 							if (empty($attachment)) {
 								continue;
 							}
-							@unlink('../attachments/'.$attachment);
-							if (file_exists('../attachments/'.$attachment)) {
-								err('Failed to delete '.$attachment);
+							@unlink('../attachments/' . $attachment);
+							if (file_exists('../attachments/' . $attachment)) {
+								err('Failed to delete ' . $attachment);
 							}
 						}
 						$db->q('UPDATE `ticketmessages` SET `attachments` = \'\' WHERE `id` = ?', $reply['id']);
 					}
 				}
 			}
-
-            echo '<div style="float:right"><a href="/Admin/Tickets/ID/'.$ticket['id'].'/Action/Close/" class="btn btn-danger" role="button">Close</a></div>';
-			echo '<h1>Support Ticket #'.$_GET['ID'].' - '.safe($ticket['title']).'</h1>';
-
-            if (!empty($ticket['userid'])) {
-                $user_row = $db->q('SELECT `firstname`, `lastname` FROM `users` WHERE `id` = ?', $ticket['userid']);
-                $user_row = $user_row[0];
-                if (empty($user_row)) {
-                    $billic->errors[] = 'This ticket is owned by User ID '.$ticket['userid'].' but the user does not exist';
-                } else {
-                    //echo 'User: <a href="/Admin/Users/ID/'. $ticket['userid'].'/">'.$user_row['firstname'].' '.$user_row['lastname'].'</a><br>';
-                }
-            }
-            if (!empty($ticket['serviceid'])) {
-                $service = $db->q('SELECT * FROM `services` WHERE `id` = ? AND `userid` = ?', $ticket['serviceid'], $ticket['userid']);
-                $service = $service[0];
-            }
-
-            echo '<hr>
+			echo '<div style="float:right"><a href="/Admin/Tickets/ID/' . $ticket['id'] . '/Action/Close/" class="btn btn-danger" role="button">Close</a></div>';
+			echo '<h1>Support Ticket #' . $_GET['ID'] . ' - ' . safe($ticket['title']) . '</h1>';
+			if (!empty($ticket['userid'])) {
+				$user_row = $db->q('SELECT `firstname`, `lastname` FROM `users` WHERE `id` = ?', $ticket['userid']);
+				$user_row = $user_row[0];
+				if (empty($user_row)) {
+					$billic->errors[] = 'This ticket is owned by User ID ' . $ticket['userid'] . ' but the user does not exist';
+				} else {
+					//echo 'User: <a href="/Admin/Users/ID/'. $ticket['userid'].'/">'.$user_row['firstname'].' '.$user_row['lastname'].'</a><br>';
+					
+				}
+			}
+			if (!empty($ticket['serviceid'])) {
+				$service = $db->q('SELECT * FROM `services` WHERE `id` = ? AND `userid` = ?', $ticket['serviceid'], $ticket['userid']);
+				$service = $service[0];
+			}
+			echo '<hr>
 <table class="table table-striped ticketdetails">
   <tr>
 	  <th>Priority</th>
@@ -237,28 +216,27 @@ class Tickets {
 	  <th>Status</th>
   </tr>
   <tr>
-	  <td>'.$this->calculate_priority(array(
-                    'userid' => $ticket['userid'],
-                )).'</td>
+	  <td>' . $this->calculate_priority(array(
+				'userid' => $ticket['userid'],
+			)) . '</td>
 	  <td>';
-            if (empty($service)) {
-                echo 'None';
-            } else {
-                echo '<a href="/Admin/Services/ID/'.$service['id'].'/">#'.$service['id'].'</a><br>';
-            }
-            echo '</td>
-	  <td>'.$billic->time_ago($ticket['lastreply']).' ago</td>
-	  <td>'.$billic->time_ago($ticket['date']).' ago</td>
+			if (empty($service)) {
+				echo 'None';
+			} else {
+				echo '<a href="/Admin/Services/ID/' . $service['id'] . '/">#' . $service['id'] . '</a><br>';
+			}
+			echo '</td>
+	  <td>' . $billic->time_ago($ticket['lastreply']) . ' ago</td>
+	  <td>' . $billic->time_ago($ticket['date']) . ' ago</td>
 	  <td>';
-            if (empty($ticket['assignedto'])) {
-                echo 'Nobody';
-            }
-            echo '</td>
-	  <td>'.$ticket['queue'].'</td>
-	  <td>'.$this->status_label($ticket['status']).'</td>
+			if (empty($ticket['assignedto'])) {
+				echo 'Nobody';
+			}
+			echo '</td>
+	  <td>' . $ticket['queue'] . '</td>
+	  <td>' . $this->status_label($ticket['status']) . '</td>
   </tr>
 </table>';
-
 			if (isset($_POST['message'])) {
 				$message = strip_tags($_POST['message'], $this->settings['allowed_tags']);
 				$message = preg_replace('/<([a-z]+)( href\="([a-z0-9\/\:\.\-\_\+\=]+)")?[^>]*>/ims', '<$1$2>', $message);
@@ -266,15 +244,15 @@ class Tickets {
 					$billic->errors[] = 'Please enter a message';
 				}
 				$last_reply = $db->q('SELECT MD5(`message`), LENGTH(`message`) FROM `ticketmessages` WHERE `tid` = ? ORDER BY `id` DESC LIMIT 1', $ticket['id']);
-				if (strlen($message)==$last_reply[0]['LENGTH(`message`)'] && md5($message)==$last_reply[0]['MD5(`message`)']) {
+				if (strlen($message) == $last_reply[0]['LENGTH(`message`)'] && md5($message) == $last_reply[0]['MD5(`message`)']) {
 					$billic->errors[] = 'You refreshed the page and tried to reply with the same message';
 				}
 				$attachments = '';
 				if (empty($billic->errors) && !empty($_FILES['files'])) {
-					foreach($_FILES['files']['tmp_name'] as $key => $tmp_name) {
+					foreach ($_FILES['files']['tmp_name'] as $key => $tmp_name) {
 						if ($_FILES['files']['error'][$key] != UPLOAD_ERR_OK) {
 							if ($_FILES['files']['error'][$key] != UPLOAD_ERR_NO_FILE) {
-								$billic->errors[] = 'There was an error while uploading the file: '.$_FILES['files']['name'][$key];
+								$billic->errors[] = 'There was an error while uploading the file: ' . $_FILES['files']['name'][$key];
 							}
 						} else {
 							$filename = basename($_FILES['files']['name'][$key]);
@@ -282,18 +260,18 @@ class Tickets {
 							$safe_chars = 'a b c d e f g h i j k l m n o p q r s t u v w x y z 0 1 2 3 4 5 6 7 8 9 _ .';
 							$safe_chars = explode(' ', $safe_chars);
 							$safe_name = '';
-							for($i=0;$i<strlen($filename);$i++) {
-								if (!in_array(strtolower($filename[$i]), $safe_chars)) {
+							for ($i = 0;$i < strlen($filename);$i++) {
+								if (!in_array(strtolower($filename[$i]) , $safe_chars)) {
 									continue;
 								}
-								$safe_name .= $filename[$i];
+								$safe_name.= $filename[$i];
 							}
 							$filename = $safe_name;
 							$filename = preg_replace('/([\.]+)/', '.', $filename);
 							$filename = preg_replace('/([_]+)/', '_', $filename);
-							$filename = time().'_'.basename($filename);
-							move_uploaded_file($tmp_name, '../attachments/'.$filename);
-							$attachments .= $filename.'|';
+							$filename = time() . '_' . basename($filename);
+							move_uploaded_file($tmp_name, '../attachments/' . $filename);
+							$attachments.= $filename . '|';
 						}
 					}
 				}
@@ -305,166 +283,165 @@ class Tickets {
 						'userid' => $billic->user['id'],
 						'date' => $now,
 						'message' => $message,
-						'attachments' => $attachments,			
+						'attachments' => $attachments,
 					));
 					$db->q('UPDATE `tickets` SET `lastreply` = ?, `status` = ?, `clientunread` = \'1\' WHERE `id` = ?', $now, $_POST['status'], $_GET['ID']);
 					$db->q('DELETE FROM `tickets_draft` WHERE `ticketid` = ? AND `userid` = ?', $ticket['id'], $billic->user['id']);
-					
 					$user_row = $db->q('SELECT `firstname`, `lastname`, `email` FROM `users` WHERE `id` = ?', $ticket['userid']);
 					$user_row = $user_row[0];
-					$billic->email($user_row['email'], 'Ticket #'.$ticket['id'].' - '.safe($ticket['title']), 'Dear '.$user_row['firstname'].' '.$user_row['lastname'].',<br>A response has been made to your ticket.<br><br>'.$message.'<br><br><hr><br><a href="http'.(get_config('billic_ssl')==1?'s':'').'://'.get_config('billic_domain').'/User/Tickets/ID/'.$ticket['id'].'/">http'.(get_config('billic_ssl')==1?'s':'').'://'.get_config('billic_domain').'/User/Tickets/ID/'.$ticket['id'].'/</a><br>'.$ticket['replypassword']);
+					$billic->email($user_row['email'], 'Ticket #' . $ticket['id'] . ' - ' . safe($ticket['title']) , 'Dear ' . $user_row['firstname'] . ' ' . $user_row['lastname'] . ',<br>A response has been made to your ticket.<br><br>' . $message . '<br><br><hr><br><a href="http' . (get_config('billic_ssl') == 1 ? 's' : '') . '://' . get_config('billic_domain') . '/User/Tickets/ID/' . $ticket['id'] . '/">http' . (get_config('billic_ssl') == 1 ? 's' : '') . '://' . get_config('billic_domain') . '/User/Tickets/ID/' . $ticket['id'] . '/</a><br>' . $ticket['replypassword']);
 					$billic->redirect('/Admin/Tickets/');
 				}
 			}
-
 			$billic->show_errors();
-
 			$this->show_messages($ticket, 'admin');
-            $this->reply_box('admin');
+			$this->reply_box('admin');
 			return;
 		}
-		
 		if (!file_exists('../attachments/')) {
 			mkdir('../attachments/', 0750);
 			if (!file_exists('../attachments/')) {
 				echo '<br><b>Warning:</b> Billic tried to create the folder at ../attachments/ but failed.<br>';
 			}
 		}
-
-        $billic->module('ListManager');
-        $billic->modules['ListManager']->configure(array(
-                    'search' => array(
-                        'id' => 'text',
-                        'subject' => 'text',
-                        'status' => array('(All)', 'Answered', 'Awaiting Reply', 'Closed', 'Customer-Reply', 'In Progress', 'Open'),
-                        'queue' => 'text',
-                    ),
+		$billic->module('ListManager');
+		$billic->modules['ListManager']->configure(array(
+			'search' => array(
+				'id' => 'text',
+				'subject' => 'text',
+				'status' => array(
+					'(All)',
+					'Answered',
+					'Awaiting Reply',
+					'Closed',
+					'Customer-Reply',
+					'In Progress',
+					'Open'
+				) ,
+				'queue' => 'text',
+			) ,
 		));
-                
-                if (empty($_POST['status'])) {
-                    $_POST['search'] = 1;
-                    $_POST['status'] = 'Awaiting Reply';
-                }
-
+		if (empty($_POST['status'])) {
+			$_POST['search'] = 1;
+			$_POST['status'] = 'Awaiting Reply';
+		}
 		$where = '';
 		$where_values = array();
 		if (isset($_POST['search'])) {
 			if (!empty($_POST['id'])) {
-                            $where .= '`id` = ? AND ';
-                            $where_values[] = $_POST['id'];
+				$where.= '`id` = ? AND ';
+				$where_values[] = $_POST['id'];
 			}
 			if (!empty($_POST['username'])) {
-                            $where .= '`username` LIKE ? AND ';
-                            $where_values[] = '%'.$_POST['username'].'%';
+				$where.= '`username` LIKE ? AND ';
+				$where_values[] = '%' . $_POST['username'] . '%';
 			}
 			if (!empty($_POST['desc'])) {
-                            $where .= '`domain` LIKE ? AND ';
-                            $where_values[] = '%'.$_POST['desc'].'%';
+				$where.= '`domain` LIKE ? AND ';
+				$where_values[] = '%' . $_POST['desc'] . '%';
 			}
 			if (!empty($_POST['plan'])) {
-                            $where .= '`plan` LIKE ? AND ';
-                            $where_values[] = '%'.$_POST['plan'].'%';
+				$where.= '`plan` LIKE ? AND ';
+				$where_values[] = '%' . $_POST['plan'] . '%';
 			}
 			if (!empty($_POST['price'])) {
-                            $where .= '`amount` = ? AND ';
-                            $where_values[] = $_POST['price'];
+				$where.= '`amount` = ? AND ';
+				$where_values[] = $_POST['price'];
 			}
-                        if ($_POST['status']=='Awaiting Reply') {
-                            $where .= '`status` != \'Closed\' AND `status` != \'Answered\' AND ';
-                        } else
-			if (!empty($_POST['status']) && $_POST['status']!='(All)') {
-                            $where .= '`status` LIKE ? AND ';
-                            $where_values[] = '%'.$_POST['status'].'%';
+			if ($_POST['status'] == 'Awaiting Reply') {
+				$where.= '`status` != \'Closed\' AND `status` != \'Answered\' AND ';
+			} else if (!empty($_POST['status']) && $_POST['status'] != '(All)') {
+				$where.= '`status` LIKE ? AND ';
+				$where_values[] = '%' . $_POST['status'] . '%';
 			}
 		}
 		$where = substr($where, 0, -4);
-
 		$func_array_select1 = array();
-		$func_array_select1[] = '`tickets`'.(empty($where)?'':' WHERE '.$where);
-		foreach($where_values as $v) {
+		$func_array_select1[] = '`tickets`' . (empty($where) ? '' : ' WHERE ' . $where);
+		foreach ($where_values as $v) {
 			$func_array_select1[] = $v;
 		}
 		$func_array_select2 = $func_array_select1;
-		$func_array_select1[0] = 'SELECT COUNT(*) FROM '.$func_array_select1[0];
-		$total = call_user_func_array(array($db, 'q'), $func_array_select1); $total = $total[0]['COUNT(*)'];
-        $pagination = $billic->pagination(array(
-            'total' => $total,
-            'list_manager' => $billic->module['ListManager'],
-        ));
-        echo $pagination['menu'];
-		$func_array_select2[0] = 'SELECT * FROM '.$func_array_select2[0].' ORDER BY `lastreply` DESC LIMIT '.$pagination['start'].','.$pagination['limit'];
-		$tickets = call_user_func_array(array($db, 'q'), $func_array_select2);
-
+		$func_array_select1[0] = 'SELECT COUNT(*) FROM ' . $func_array_select1[0];
+		$total = call_user_func_array(array(
+			$db,
+			'q'
+		) , $func_array_select1);
+		$total = $total[0]['COUNT(*)'];
+		$pagination = $billic->pagination(array(
+			'total' => $total,
+		));
+		echo $pagination['menu'];
+		$func_array_select2[0] = 'SELECT * FROM ' . $func_array_select2[0] . ' ORDER BY `lastreply` DESC LIMIT ' . $pagination['start'] . ',' . $pagination['limit'];
+		$tickets = call_user_func_array(array(
+			$db,
+			'q'
+		) , $func_array_select2);
 		$billic->set_title('Admin/Tickets');
 		echo '<h1><i class="icon-ticket"></i> Support Tickets</h1>';
-                
 		$billic->show_errors();
 		echo $billic->modules['ListManager']->search_box();
-		echo '<div style="float: right;padding-right: 40px;">Showing ' . $pagination['start_text'] . ' to ' . $pagination['end_text'] . ' of ' . $total . '</div>'.$billic->modules['ListManager']->search_link();
-
+		echo '<div style="float: right;padding-right: 40px;">Showing ' . $pagination['start_text'] . ' to ' . $pagination['end_text'] . ' of ' . $total . '</div>' . $billic->modules['ListManager']->search_link();
 		if (empty($tickets)) {
 			echo '<p>No Support Tickets matching filter.</p>';
 		} else {
 			echo '<table class="table table-striped"><tr><th>Subject</th><th>Queue</th><th>Priority</th><th>Status</th><th>Client</th><th>Created</th><th>Last Reply</th></tr>';
-			foreach($tickets as $ticket) {
+			foreach ($tickets as $ticket) {
 				$user_row = $db->q('SELECT `firstname`, `lastname` FROM `users` WHERE `id` = ?', $ticket['userid']);
 				$user_row = $user_row[0];
 				if (empty($user_row)) {
 					$client = safe(wordwrap($ticket['email'], 25, PHP_EOL, true));
 				} else {
-					$client = '<a href="/Admin/Users/ID/'.$ticket['userid'].'/">'.safe(wordwrap($user_row['firstname'].' '.$user_row['lastname'], 25, PHP_EOL, true)).'</a>';
+					$client = '<a href="/Admin/Users/ID/' . $ticket['userid'] . '/">' . safe(wordwrap($user_row['firstname'] . ' ' . $user_row['lastname'], 25, PHP_EOL, true)) . '</a>';
 					$num_tickets_user = $db->q('SELECT COUNT(*) FROM `tickets` WHERE `status` != \'Closed\' AND `status` != \'Answered\' AND `userid` = ?', $ticket['userid']);
 					$num_tickets_user = $num_tickets_user[0]['COUNT(*)'];
-					if ($num_tickets_user>1) {
-                        $client .= ' <span class="badge badge-blue" title="Tickets of this user awaiting reply">'.$num_tickets_user.'</span>';
+					if ($num_tickets_user > 1) {
+						$client.= ' <span class="badge badge-blue" title="Tickets of this user awaiting reply">' . $num_tickets_user . '</span>';
 					}
 				}
-				echo '<tr><td><a href="/Admin/Tickets/ID/'.$ticket['id'].'/">'.($ticket['adminunread']==1?'<b>':'').htmlentities($ticket['title'], ENT_QUOTES, 'UTF-8').($ticket['adminunread']==1?'</b>':'').'</a></td><td>'.$ticket['queue'].'</td><td>'.
-                    $this->calculate_priority(array(
-                        'userid' => $ticket['userid'],
-                    )).'</td><td>'. $this->status_label($ticket['status']).'</td><td>'.$client.'</td><td>'.$billic->time_ago($ticket['date']).' ago</td><td>'.$billic->time_ago($ticket['lastreply']).' ago</td></tr>';
+				echo '<tr><td><a href="/Admin/Tickets/ID/' . $ticket['id'] . '/">' . ($ticket['adminunread'] == 1 ? '<b>' : '') . htmlentities($ticket['title'], ENT_QUOTES, 'UTF-8') . ($ticket['adminunread'] == 1 ? '</b>' : '') . '</a></td><td>' . $ticket['queue'] . '</td><td>' . $this->calculate_priority(array(
+					'userid' => $ticket['userid'],
+				)) . '</td><td>' . $this->status_label($ticket['status']) . '</td><td>' . $client . '</td><td>' . $billic->time_ago($ticket['date']) . ' ago</td><td>' . $billic->time_ago($ticket['lastreply']) . ' ago</td></tr>';
 			}
 			echo '</table>';
 		}
 	}
-
-    function status_label($status) {
-        switch($status) {
-            case 'Open':
-            case 'Customer-Reply':
-                return '<span class="label label-danger">Awaiting Reply</span>';
-                break;
-            case 'In Progress':
-                return '<span class="label label-primary">In Progress</span>';
-                break;
-            case 'Answered':
-                return '<span class="label label-success">Answered</span>';
-                break;
-            default:
-                return '<span class="label label-default">'.$status.'</span>';
-                break;
-        }
-    }
-	
+	function status_label($status) {
+		switch ($status) {
+			case 'Open':
+			case 'Customer-Reply':
+				return '<span class="label label-danger">Awaiting Reply</span>';
+			break;
+			case 'In Progress':
+				return '<span class="label label-primary">In Progress</span>';
+			break;
+			case 'Answered':
+				return '<span class="label label-success">Answered</span>';
+			break;
+			default:
+				return '<span class="label label-default">' . $status . '</span>';
+			break;
+		}
+	}
 	function save_draft($ticketid, $message) {
 		global $billic, $db;
-		$db->q('UPDATE `tickets_draft` SET `message` = ?, `timestamp` = ? WHERE `ticketid` = ? AND `userid` = ?', $message, time(), $ticketid, $billic->user['id']);
-		if($db->affected_rows==0) {
+		$db->q('UPDATE `tickets_draft` SET `message` = ?, `timestamp` = ? WHERE `ticketid` = ? AND `userid` = ?', $message, time() , $ticketid, $billic->user['id']);
+		if ($db->affected_rows == 0) {
 			$db->insert('tickets_draft', array(
 				'ticketid' => $ticketid,
 				'userid' => $billic->user['id'],
 				'message' => $message,
-				'timestamp' => time(),
+				'timestamp' => time() ,
 			));
 		}
-		echo json_encode(array('status'=>'OK'));
+		echo json_encode(array(
+			'status' => 'OK'
+		));
 		exit;
 	}
-	
 	function user_area() {
 		global $billic, $db;
 		$billic->force_login();
-		
 		if (isset($_GET['Download'])) {
 			$attachment = basename(urldecode($_GET['Download']));
 			if (empty($attachment)) {
@@ -527,19 +504,15 @@ class Tickets {
 			readfile($src);
 			exit;
 		}
-		
-		if ($_GET['Action']=='CheckReply') {
+		if ($_GET['Action'] == 'CheckReply') {
 			$this->check_reply($ticket);
 		}
-	
 		if (isset($_GET['New'])) {
 			$billic->set_title('New Ticket');
 			echo '<h1>New Support Ticket</h1>';
-
-			if (empty($_POST['title'])&&!empty($_GET['Title'])) {
+			if (empty($_POST['title']) && !empty($_GET['Title'])) {
 				$_POST['title'] = urldecode($_GET['Title']);
 			}
-
 			if (isset($_POST['message'])) {
 				if (empty($_POST['title'])) {
 					$billic->errors[] = 'Please enter a short summary';
@@ -549,23 +522,21 @@ class Tickets {
 				if (empty($message)) {
 					$billic->errors[] = 'Please enter a message';
 				}
-				
 				$successful_uploads = 0;
-				foreach($_FILES['files']['error'] as $v) {
+				foreach ($_FILES['files']['error'] as $v) {
 					if ($v == UPLOAD_ERR_OK) {
 						$successful_uploads++;
 					}
 				}
-				if (isset($_POST['min_attachments']) && $_POST['min_attachments']>$successful_uploads) {
-					$billic->errors[] = 'You must upload at least '.floor($_POST['min_attachments']).' attachments.';	
+				if (isset($_POST['min_attachments']) && $_POST['min_attachments'] > $successful_uploads) {
+					$billic->errors[] = 'You must upload at least ' . floor($_POST['min_attachments']) . ' attachments.';
 				}
-				
 				$attachments = '';
 				if (empty($billic->errors) && !empty($_FILES['files'])) {
-					foreach($_FILES['files']['tmp_name'] as $key => $tmp_name) {
+					foreach ($_FILES['files']['tmp_name'] as $key => $tmp_name) {
 						if ($_FILES['files']['error'][$key] != UPLOAD_ERR_OK) {
 							if ($_FILES['files']['error'][$key] != UPLOAD_ERR_NO_FILE) {
-								$billic->errors[] = 'There was an error while uploading the file: '.$_FILES['files']['name'][$key];
+								$billic->errors[] = 'There was an error while uploading the file: ' . $_FILES['files']['name'][$key];
 							}
 						} else {
 							$filename = basename($_FILES['files']['name'][$key]);
@@ -573,23 +544,22 @@ class Tickets {
 							$safe_chars = 'a b c d e f g h i j k l m n o p q r s t u v w x y z 0 1 2 3 4 5 6 7 8 9 _ .';
 							$safe_chars = explode(' ', $safe_chars);
 							$safe_name = '';
-							for($i=0;$i<strlen($filename);$i++) {
-								if (!in_array(strtolower($filename[$i]), $safe_chars)) {
+							for ($i = 0;$i < strlen($filename);$i++) {
+								if (!in_array(strtolower($filename[$i]) , $safe_chars)) {
 									continue;
 								}
-								$safe_name .= $filename[$i];
+								$safe_name.= $filename[$i];
 							}
 							$filename = $safe_name;
 							$filename = preg_replace('/([\.]+)/', '.', $filename);
 							$filename = preg_replace('/([_]+)/', '_', $filename);
-							$filename = time().'_'.basename($filename);
-							move_uploaded_file($tmp_name, '../attachments/'.$filename);
-							$attachments .= $filename.'|';
+							$filename = time() . '_' . basename($filename);
+							move_uploaded_file($tmp_name, '../attachments/' . $filename);
+							$attachments.= $filename . '|';
 						}
 					}
 				}
 				$attachments = substr($attachments, 0, -1);
-				
 				if (!empty($_POST['serviceid'])) {
 					$serviceid = $db->q('SELECT * FROM `services` WHERE `userid` = ? AND `id` = ?', $billic->user['id'], $_POST['serviceid']);
 					$serviceid = $serviceid[0];
@@ -597,92 +567,84 @@ class Tickets {
 						$_POST['serviceid'] = '';
 					}
 				}
-
 				if (empty($billic->errors)) {
 					$now = time();
 					$ticketid = $db->insert('tickets', array(
-						'queue' => 'Support', 
+						'queue' => 'Support',
 						'userid' => $billic->user['id'],
-						'date' => $now, 
-						'title' => $_POST['title'], 
-						'status' => 'Open', 
-						'lastreply' => $now, 
-						'clientunread' => 1, 
-						'adminunread' => 1, 
+						'date' => $now,
+						'title' => $_POST['title'],
+						'status' => 'Open',
+						'lastreply' => $now,
+						'clientunread' => 1,
+						'adminunread' => 1,
 						'serviceid' => $_POST['serviceid'],
-						'replypassword' => $billic->rand_str(30),
+						'replypassword' => $billic->rand_str(30) ,
 					));
 					$db->insert('ticketmessages', array(
-						'tid' => $ticketid, 
+						'tid' => $ticketid,
 						'userid' => $billic->user['id'],
-						'date' => $now, 
-						'message' => $message, 
-						'attachments' => $attachments, 
+						'date' => $now,
+						'message' => $message,
+						'attachments' => $attachments,
 					));
 					$db->q('DELETE FROM `tickets_draft` WHERE `ticketid` = ? AND `userid` = ?', 0, $billic->user['id']);
-					
-					$url = 'http'.(get_config('billic_ssl')?'s':'').'://'.$_SERVER['HTTP_HOST'].'/Admin/Tickets/ID/'.$ticketid.'/';
+					$url = 'http' . (get_config('billic_ssl') ? 's' : '') . '://' . $_SERVER['HTTP_HOST'] . '/Admin/Tickets/ID/' . $ticketid . '/';
 					$emails = get_config('Tickets_emails');
 					$emails = explode(PHP_EOL, $emails);
-					foreach($emails as $email) {
+					foreach ($emails as $email) {
 						$email = trim($email);
-						if (empty($email)) { continue; }
-						$billic->email($email, 'Support Ticket #'.$ticketid.' Opened Notification', $billic->user['firstname'].' '.$billic->user['lastname'].' has opened a support ticket.<br><a href="'.$url.'">'.$url.'</a><br>'.$message);
+						if (empty($email)) {
+							continue;
+						}
+						$billic->email($email, 'Support Ticket #' . $ticketid . ' Opened Notification', $billic->user['firstname'] . ' ' . $billic->user['lastname'] . ' has opened a support ticket.<br><a href="' . $url . '">' . $url . '</a><br>' . $message);
 					}
-					
-					$billic->redirect('/User/Tickets/ID/'.$ticketid.'/');
+					$billic->redirect('/User/Tickets/ID/' . $ticketid . '/');
 				}
 			}
-
 			$billic->show_errors();
-
 			echo '<form method="POST" id="replyForm" enctype="multipart/form-data"><table class="table table-striped" id="attachTable">';
 			if (isset($_POST['min_attachments'])) {
-				echo '<input type="hidden" name="min_attachments" value="'.floor($_POST['min_attachments']).'">';	
+				echo '<input type="hidden" name="min_attachments" value="' . floor($_POST['min_attachments']) . '">';
 			}
 			$services = $db->q('SELECT * FROM `services` WHERE `userid` = ? AND (`domainstatus` = \'Active\' OR `domainstatus` = \'Suspended\' OR `domainstatus` = \'Pending\')', $billic->user['id']);
 			if (!empty($services)) {
 				echo '<tr><td>Service:<br>(if applicable)</td><td><select class="form-control" name="serviceid"><option value=""></option>';
-				foreach($services as $service) {
-					echo '<option value="'.$service['id'].'"'.($_GET['Service']==$service['id']?' selected':'').'>'.$billic->service_type($service).'</option>';
+				foreach ($services as $service) {
+					echo '<option value="' . $service['id'] . '"' . ($_GET['Service'] == $service['id'] ? ' selected' : '') . '>' . $billic->service_type($service) . '</option>';
 				}
 				echo '</select></td></tr>';
 			}
-			echo '<tr><td width="110">Title:</td><td colspan="5"><input type="text" class="form-control" name="title" id="title" value="'.addslashes($_POST['title']).'" maxlength="75"></td></tr>';
-            $this->reply_box('newticket');
+			echo '<tr><td width="110">Title:</td><td colspan="5"><input type="text" class="form-control" name="title" id="title" value="' . addslashes($_POST['title']) . '" maxlength="75"></td></tr>';
+			$this->reply_box('newticket');
 			//<td>SSH/RDP Port:<br>(if applicable)</td><td><input type="text" class="form-control" name="connport" value="'.addslashes($_POST['port']).'" autocomplete="off"></td>
 			//<td>Root/Admin User:<br>(if applicable)</td><td><input type="text" class="form-control" name="loginuser" value="'.addslashes($_POST['user']).'" autocomplete="off"></td>
 			//<td>Root/Admin Pass:<br>(if applicable)</td><td><input type="password" class="form-control" name="loginpass" value="'.addslashes($_POST['pass']).'" autocomplete="off"></td></tr>
 			echo '</table></form>';
 			return;
 		}
-		
 		if (isset($_GET['ID'])) {
 			$ticket = $db->q('SELECT * FROM `tickets` WHERE `id` = ? AND `userid` = ?', $_GET['ID'], $billic->user['id']);
 			$ticket = $ticket[0];
 			if (empty($ticket)) {
-				err("Ticket ".$_GET['ID']." does not exist");
+				err("Ticket " . $_GET['ID'] . " does not exist");
 			}
-			
-			if ($_GET['Action']=='SaveDraft') {
+			if ($_GET['Action'] == 'SaveDraft') {
 				$billic->disable_content();
 				$this->save_draft($ticket['id'], $_POST['message']);
 				exit;
 			}
-
-			$billic->set_title('Ticket #'.$ticket['id']);
-			echo '<h1>Support Ticket #'.$ticket['id'].' - '.htmlentities($ticket['title']).'</h1>';
-
+			$billic->set_title('Ticket #' . $ticket['id']);
+			echo '<h1>Support Ticket #' . $ticket['id'] . ' - ' . htmlentities($ticket['title']) . '</h1>';
 			if (!empty($ticket['serviceid'])) {
 				$service = $db->q('SELECT * FROM `services` WHERE `id` = ? AND `userid` = ?', $ticket['serviceid'], $ticket['userid']);
 				$service = $service[0];
 				if (empty($service)) {
-					$billic->errors[] = 'This ticket is regarding service ID '.$_GET['ID'].' but it does not exist';
+					$billic->errors[] = 'This ticket is regarding service ID ' . $_GET['ID'] . ' but it does not exist';
 				} else {
-					echo 'Service: <a href="/Admin/Services/ID/'.$service['id'].'/">'.$billic->service_type($service).'</a><br><br>';
+					echo 'Service: <a href="/Admin/Services/ID/' . $service['id'] . '/">' . $billic->service_type($service) . '</a><br><br>';
 				}
 			}
-
 			if (isset($_POST['message'])) {
 				$message = strip_tags($_POST['message'], $this->settings['allowed_tags']);
 				$message = preg_replace('/<([a-z]+)( href\="([a-z0-9\/\:\.\-\_\+\=]+)")?[^>]*>/ims', '<$1$2>', $message);
@@ -690,15 +652,15 @@ class Tickets {
 					$billic->errors[] = 'Please enter a message';
 				}
 				$last_reply = $db->q('SELECT MD5(`message`), LENGTH(`message`) FROM `ticketmessages` WHERE `tid` = ? AND `userid` = ? ORDER BY `id` DESC LIMIT 1', $ticket['id'], $billic->user['id']);
-				if (strlen($message)==$last_reply[0]['LENGTH(`message`)'] && md5($message)==$last_reply[0]['MD5(`message`)']) {
+				if (strlen($message) == $last_reply[0]['LENGTH(`message`)'] && md5($message) == $last_reply[0]['MD5(`message`)']) {
 					$billic->errors[] = 'You refreshed the page and tried to reply with the same message';
 				}
 				$attachments = '';
 				if (empty($billic->errors) && !empty($_FILES['files'])) {
-					foreach($_FILES['files']['tmp_name'] as $key => $tmp_name) {
+					foreach ($_FILES['files']['tmp_name'] as $key => $tmp_name) {
 						if ($_FILES['files']['error'][$key] != UPLOAD_ERR_OK) {
 							if ($_FILES['files']['error'][$key] != UPLOAD_ERR_NO_FILE) {
-								$billic->errors[] = 'There was an error while uploading the file: '.$_FILES['files']['name'][$key];
+								$billic->errors[] = 'There was an error while uploading the file: ' . $_FILES['files']['name'][$key];
 							}
 						} else {
 							$filename = basename($_FILES['files']['name'][$key]);
@@ -706,18 +668,18 @@ class Tickets {
 							$safe_chars = 'a b c d e f g h i j k l m n o p q r s t u v w x y z 0 1 2 3 4 5 6 7 8 9 _ .';
 							$safe_chars = explode(' ', $safe_chars);
 							$safe_name = '';
-							for($i=0;$i<strlen($filename);$i++) {
-								if (!in_array(strtolower($filename[$i]), $safe_chars)) {
+							for ($i = 0;$i < strlen($filename);$i++) {
+								if (!in_array(strtolower($filename[$i]) , $safe_chars)) {
 									continue;
 								}
-								$safe_name .= $filename[$i];
+								$safe_name.= $filename[$i];
 							}
 							$filename = $safe_name;
 							$filename = preg_replace('/([\.]+)/', '.', $filename);
 							$filename = preg_replace('/([_]+)/', '_', $filename);
-							$filename = time().'_'.basename($filename);
-							move_uploaded_file($tmp_name, '../attachments/'.$filename);
-							$attachments .= $filename.'|';
+							$filename = time() . '_' . basename($filename);
+							move_uploaded_file($tmp_name, '../attachments/' . $filename);
+							$attachments.= $filename . '|';
 						}
 					}
 				}
@@ -729,84 +691,84 @@ class Tickets {
 						'userid' => $billic->user['id'],
 						'date' => $now,
 						'message' => $message,
-						'attachments' => $attachments,			
+						'attachments' => $attachments,
 					));
 					$db->q('UPDATE `tickets` SET `lastreply` = ?, `status` = \'Customer-Reply\', `adminunread` = \'1\' WHERE `id` = ?', $now, $ticket['id']);
 					$db->q('DELETE FROM `tickets_draft` WHERE `ticketid` = ? AND `userid` = ?', $ticketid, $billic->user['id']);
-					
-					$url = 'http'.(get_config('billic_ssl')?'s':'').'://'.$_SERVER['HTTP_HOST'].'/Admin/Tickets/ID/'.$ticket['id'].'/';
+					$url = 'http' . (get_config('billic_ssl') ? 's' : '') . '://' . $_SERVER['HTTP_HOST'] . '/Admin/Tickets/ID/' . $ticket['id'] . '/';
 					$emails = get_config('Tickets_emails');
 					$emails = explode(PHP_EOL, $emails);
-					foreach($emails as $email) {
+					foreach ($emails as $email) {
 						$email = trim($email);
-						if (empty($email)) { continue; }
-						$billic->email($email, 'Support Ticket #'.$ticket['id'].' Reply Notification', $billic->user['firstname'].' '.$billic->user['lastname'].' has replied.<br><a href="'.$url.'">'.$url.'</a><br>'.$message);
+						if (empty($email)) {
+							continue;
+						}
+						$billic->email($email, 'Support Ticket #' . $ticket['id'] . ' Reply Notification', $billic->user['firstname'] . ' ' . $billic->user['lastname'] . ' has replied.<br><a href="' . $url . '">' . $url . '</a><br>' . $message);
 					}
 				}
 			}
-
 			$billic->show_errors();
-
 			$this->show_messages($ticket, 'client');
-            $this->reply_box('client');
+			$this->reply_box('client');
 			return;
 		}
-		
 		$billic->set_title('My Support Tickets');
 		echo '<h1><i class="icon-ticket"></i> My Support Tickets</h1>';
 		echo '<p><a href="/User/Tickets/New" class="green"><i class="icon-plus"></i> Click here to open a new ticket</a></p><br>';
-
 		$tickets = $db->q('SELECT * FROM `tickets` WHERE `userid` = ? ORDER BY `lastreply` DESC', $billic->user['id']);
 		if (empty($tickets)) {
 			echo '<p>You have no Support Tickets.</p>';
 		} else {
 			echo '<table class="table table-striped"><tr><th>Subject</th><th>Queue</th><th>Status</th><th width="150">Last Updated</th></tr>';
-			foreach($tickets as $ticket) {
-				echo '<tr><td><a href="/User/Tickets/ID/'.$ticket['id'].'/">'.($ticket['clientunread']==1?'<b>':'').htmlentities($ticket['title']).($ticket['clientunread']==1?'</b>':'').'</a></td><td>'.$ticket['queue'].'</td><td>'.$this->status_label($ticket['status']).'</td><td>'.$billic->time_ago($ticket['lastreply']).' ago</td></tr>';
+			foreach ($tickets as $ticket) {
+				echo '<tr><td><a href="/User/Tickets/ID/' . $ticket['id'] . '/">' . ($ticket['clientunread'] == 1 ? '<b>' : '') . htmlentities($ticket['title']) . ($ticket['clientunread'] == 1 ? '</b>' : '') . '</a></td><td>' . $ticket['queue'] . '</td><td>' . $this->status_label($ticket['status']) . '</td><td>' . $billic->time_ago($ticket['lastreply']) . ' ago</td></tr>';
 			}
 			echo '</table>';
 		}
 	}
-
-    function reply_box($mode) {
-        global $billic, $db;
-        switch($mode) {
-            case 'newticket':
-                $title = 'Open a new ticket';
-                break;
-            case 'admin':
-            case 'client':
-                $title = 'Reply to this ticket';
-                break;
-        }
+	function reply_box($mode) {
+		global $billic, $db;
+		switch ($mode) {
+			case 'newticket':
+				$title = 'Open a new ticket';
+			break;
+			case 'admin':
+			case 'client':
+				$title = 'Reply to this ticket';
+			break;
+		}
 		echo '<span id="ticket_draft_ajax"></span>';
 		echo '<span id="ticket_reply_ajax"></span>';
-        $billic->add_script('//cdn.ckeditor.com/4.5.9/basic/ckeditor.js');
-        if ($mode!='newticket') {
-            //echo '<div class="alert alert-danger alert-dismissible" role="alert"><button type="button" class="close" data-dismiss="alert" aria-label="Close"><span aria-hidden="true">&times;</span></button><strong>Warning! Josh Jameson </strong> is currently replying to this ticket.</div>';
-            echo '<form method="POST" id="replyForm" enctype="multipart/form-data"><table class="table table-striped" id="attachTable"><tr><th colspan="2">'.$title.'</th></tr>';
-        }
+		$billic->add_script('//cdn.ckeditor.com/4.5.9/basic/ckeditor.js');
+		if ($mode != 'newticket') {
+			//echo '<div class="alert alert-danger alert-dismissible" role="alert"><button type="button" class="close" data-dismiss="alert" aria-label="Close"><span aria-hidden="true">&times;</span></button><strong>Warning! Josh Jameson </strong> is currently replying to this ticket.</div>';
+			echo '<form method="POST" id="replyForm" enctype="multipart/form-data"><table class="table table-striped" id="attachTable"><tr><th colspan="2">' . $title . '</th></tr>';
+		}
 		$draft = $db->q('SELECT `message` FROM `tickets_draft` WHERE `ticketid` = ? AND `userid` = ?', $_GET['ID'], $billic->user['id']);
 		$draft = $draft[0]['message'];
 		if (!empty($draft)) {
-				$_POST['message'] = $draft;
+			$_POST['message'] = $draft;
 		}
-        echo '<tr><td colspan="2"><textarea name="message" id="ticket_message" style="width:99%; height:100px">'.(empty($_POST['message'])?$billic->user['signature']:htmlentities($_POST['message'], ENT_QUOTES, 'UTF-8')).'</textarea></td></tr>';
-        echo '<tr><td colspan="2"><button type="button" class="btn btn-info" onClick="ticket_add_attachment()" style="float:right"><i class="icon-paperclip"></i> Add an attachment</button><div class="input-group">';
-        if ($mode=='admin') {
-            echo '<select class="form-control" name="status" style="width:150px;margin-right:10px">';
-            $ticket_status_list = array('Answered', 'In Progress', 'Closed');
-            foreach ($ticket_status_list as $status) {
-                echo '<option value="' . $status . '"' . ($_POST['status'] == $status ? ' selected' : '') . '>' . $status . '</option>';
-            }
-            echo '</select>';
-        }
-        if ($mode=='newticket') {
-            echo ' <input type="submit" class="btn btn-success" value="Open Ticket &raquo"></div></td></tr>';
-        } else {
-            echo ' <input type="submit" class="btn btn-success" value="Reply &raquo;"></div></td></tr></table></form>';
-        }
-        ?><script type="text/javascript">var attachment_count=0; function ticket_add_attachment() { attachment_count++; $('#attachTable').append('<tr><td width="150">Attachment #'+attachment_count+':</td><td><input class="form-control" type="file" name="files[]"></td></tr>'); }
+		echo '<tr><td colspan="2"><textarea name="message" id="ticket_message" style="width:99%; height:100px">' . (empty($_POST['message']) ? $billic->user['signature'] : htmlentities($_POST['message'], ENT_QUOTES, 'UTF-8')) . '</textarea></td></tr>';
+		echo '<tr><td colspan="2"><button type="button" class="btn btn-info" onClick="ticket_add_attachment()" style="float:right"><i class="icon-paperclip"></i> Add an attachment</button><div class="input-group">';
+		if ($mode == 'admin') {
+			echo '<select class="form-control" name="status" style="width:150px;margin-right:10px">';
+			$ticket_status_list = array(
+				'Answered',
+				'In Progress',
+				'Closed'
+			);
+			foreach ($ticket_status_list as $status) {
+				echo '<option value="' . $status . '"' . ($_POST['status'] == $status ? ' selected' : '') . '>' . $status . '</option>';
+			}
+			echo '</select>';
+		}
+		if ($mode == 'newticket') {
+			echo ' <input type="submit" class="btn btn-success" value="Open Ticket &raquo"></div></td></tr>';
+		} else {
+			echo ' <input type="submit" class="btn btn-success" value="Reply &raquo;"></div></td></tr></table></form>';
+		}
+?><script type="text/javascript">var attachment_count=0; function ticket_add_attachment() { attachment_count++; $('#attachTable').append('<tr><td width="150">Attachment #'+attachment_count+':</td><td><input class="form-control" type="file" name="files[]"></td></tr>'); }
 
 addLoadEvent(function() {
 	// Update message while typing (part 1)
@@ -862,8 +824,8 @@ function lookup(key_count) {
 }
 
 </script><?php
-		if (array_key_exists('ID', $_GET) && ($billic->user_has_permission($billic->user, 'admin') || get_config('tickets_checkreply_users')==1)) {
-			?>
+		if (array_key_exists('ID', $_GET) && ($billic->user_has_permission($billic->user, 'admin') || get_config('tickets_checkreply_users') == 1)) {
+?>
 <script type="text/javascript">
 // Check if someone is already replying to the ticket
 function ticket_check_reply() {
@@ -889,48 +851,43 @@ addLoadEvent(function() {
 
 <?php
 		}
-
-        /*
-        if ($billic->user_has_permission($billic->user, 'Users_Verify')) {
-            echo '<br>';
-            $user_row = $db->q('SELECT `verified`, `firstname`, `lastname` FROM `users` WHERE `id` = ?', $ticket['userid']);
-            $user_row = $user_row[0];
-            if ($user_row['verified']==0) {
-                echo '<a href="/Admin/Tickets/ID/'.$ticket['id'].'/Verify/1/" onclick="return confirm(\'Verify Account? (Attachments will be deleted)\');">Verify the account for '.safe($user_row['firstname']).' '.safe($user_row['lastname']).'</a>';
-            }
-            if ($user_row['verified']==1) {
-                echo '<a href="/Admin/Tickets/ID/'.$ticket['id'].'/Verify/0/" onclick="return confirm(\'Remove account verification?\');">Remove the account verification</a>';
-            }
-        }
-        */
-    }
-
-    function calculate_priority($array) {
-        global $billic, $db;
-
-        //$priority = rand(0, 2);
-        $priority = 1;
-
-        switch($priority) {
-            case 0:
-                return '<span class="label label-info">Low</span>';
-                break;
-            case 1:
-                return '<span class="label label-primary">Normal</span>';
-                break;
-            case 2:
-                return '<span class="label label-danger">Urgent</span>';
-                break;
-        }
-    }
-	
+		/*
+		      if ($billic->user_has_permission($billic->user, 'Users_Verify')) {
+		          echo '<br>';
+		          $user_row = $db->q('SELECT `verified`, `firstname`, `lastname` FROM `users` WHERE `id` = ?', $ticket['userid']);
+		          $user_row = $user_row[0];
+		          if ($user_row['verified']==0) {
+		              echo '<a href="/Admin/Tickets/ID/'.$ticket['id'].'/Verify/1/" onclick="return confirm(\'Verify Account? (Attachments will be deleted)\');">Verify the account for '.safe($user_row['firstname']).' '.safe($user_row['lastname']).'</a>';
+		          }
+		          if ($user_row['verified']==1) {
+		              echo '<a href="/Admin/Tickets/ID/'.$ticket['id'].'/Verify/0/" onclick="return confirm(\'Remove account verification?\');">Remove the account verification</a>';
+		          }
+		      }
+		*/
+	}
+	function calculate_priority($array) {
+		global $billic, $db;
+		//$priority = rand(0, 2);
+		$priority = 1;
+		switch ($priority) {
+			case 0:
+				return '<span class="label label-info">Low</span>';
+			break;
+			case 1:
+				return '<span class="label label-primary">Normal</span>';
+			break;
+			case 2:
+				return '<span class="label label-danger">Urgent</span>';
+			break;
+		}
+	}
 	function settings($array) {
 		global $billic, $db;
 		if (empty($_POST['update'])) {
 			echo '<form method="POST"><input type="hidden" name="billic_ajax_module" value="Tickets"><table class="table table-striped">';
 			echo '<tr><th>Setting</th><th>Value</th></tr>';
-			echo '<tr><td>Email Notifications</td><td><textarea name="Tickets_emails" class="form-control">'.safe(get_config('Tickets_emails')).'</textarea><br>A list of emails to send support ticket notifications to. Place 1 email per line.</td></tr>';
-			echo '<tr><td colspan="2"><inpu type="checkbox" name="Tickets_christmas" value="1"'.(get_config('Tickets_christmas')==1?' checked':'').'> Enable Santa hats over avatars during Christmas holidays?</td></tr>';
+			echo '<tr><td>Email Notifications</td><td><textarea name="Tickets_emails" class="form-control">' . safe(get_config('Tickets_emails')) . '</textarea><br>A list of emails to send support ticket notifications to. Place 1 email per line.</td></tr>';
+			echo '<tr><td colspan="2"><inpu type="checkbox" name="Tickets_christmas" value="1"' . (get_config('Tickets_christmas') == 1 ? ' checked' : '') . '> Enable Santa hats over avatars during Christmas holidays?</td></tr>';
 			echo '<tr><td colspan="2" align="center"><input type="submit" class="btn btn-default" name="update" value="Update &raquo;"></td></tr>';
 			echo '</table></form>';
 		} else {
@@ -941,43 +898,42 @@ addLoadEvent(function() {
 			}
 		}
 	}
-
-    function users_submodule($array) {
-        global $billic, $db;
-        echo '<table class="table table-striped"><tr><th>Ticket&nbsp;#</th><th>Queue</th><th>Subject</th><th>Status</th><th>Last Updated</th></tr>';
-        $tickets = $db->q('SELECT * FROM `tickets` WHERE `userid` = ? ORDER BY `lastreply` DESC', $array['user']['id']);
-        if (empty($tickets)) {
-            echo '<tr><td colspan="20">User has no tickets</td></tr>';
-        }
-        foreach($tickets as $ticket) {
-            echo '<tr><td><a href="/Admin/Tickets/ID/'.$ticket['id'].'/">'.$ticket['id'].'</a></td><td>'.$ticket['queue'].'</td><td>'.($ticket['adminunread']==1?'<b>':'').htmlentities($ticket['title']).($ticket['clientunread']==1?'</b>':'').'</td><td>'.$ticket['status'].'</td><td>'.$billic->time_ago($ticket['lastreply']).' ago</td></tr>';
-        }
-    }
+	function users_submodule($array) {
+		global $billic, $db;
+		echo '<table class="table table-striped"><tr><th>Ticket&nbsp;#</th><th>Queue</th><th>Subject</th><th>Status</th><th>Last Updated</th></tr>';
+		$tickets = $db->q('SELECT * FROM `tickets` WHERE `userid` = ? ORDER BY `lastreply` DESC', $array['user']['id']);
+		if (empty($tickets)) {
+			echo '<tr><td colspan="20">User has no tickets</td></tr>';
+		}
+		foreach ($tickets as $ticket) {
+			echo '<tr><td><a href="/Admin/Tickets/ID/' . $ticket['id'] . '/">' . $ticket['id'] . '</a></td><td>' . $ticket['queue'] . '</td><td>' . ($ticket['adminunread'] == 1 ? '<b>' : '') . htmlentities($ticket['title']) . ($ticket['clientunread'] == 1 ? '</b>' : '') . '</td><td>' . $ticket['status'] . '</td><td>' . $billic->time_ago($ticket['lastreply']) . ' ago</td></tr>';
+		}
+	}
 	function api() {
 		global $billic, $db;
 		$billic->force_login();
-		switch($_POST['action']) {
+		switch ($_POST['action']) {
 			case 'list':
 				if (!$billic->user_has_permission($billic->user, 'admin')) {
-					err('You do not have permission');	
+					err('You do not have permission');
 				}
 				if (empty($_POST['status'])) {
 					$tickets = $db->q('SELECT * FROM `tickets` WHERE `status` = \'Customer-Reply\' OR `status` = \'Open\' OR `status` = \'In Progress\' ORDER BY `lastreply` DESC');
 				} else {
 					$tickets = $db->q('SELECT * FROM `tickets` WHERE `status` = ? ORDER BY `lastreply` DESC', $_POST['status']);
 				}
-				if ($_POST['name']==1) {
-					foreach($tickets as $k => $v) {
+				if ($_POST['name'] == 1) {
+					foreach ($tickets as $k => $v) {
 						$user = $db->q('SELECT `firstname`, `lastname`, `companyname` FROM `users` WHERE `id` = ?', $v['userid']);
 						$user = $user[0];
-						$tickets[$k]['name'] = $user['firstname'].' '.$user['lastname'];
+						$tickets[$k]['name'] = $user['firstname'] . ' ' . $user['lastname'];
 						if (!empty($user['companyname'])) {
-							$tickets[$k]['name'] .= ' ('.$user['companyname'].')';
+							$tickets[$k]['name'].= ' (' . $user['companyname'] . ')';
 						}
 					}
 				}
-				if ($_POST['timeago']==1) {
-					foreach($tickets as $k => $v) {
+				if ($_POST['timeago'] == 1) {
+					foreach ($tickets as $k => $v) {
 						$tickets[$k]['timeago'] = $billic->time_ago($v['lastreply']);
 					}
 				}
@@ -994,7 +950,7 @@ addLoadEvent(function() {
 				*/
 				echo json_encode($tickets);
 				exit;
-				break;
+			break;
 		}
 	}
 }
