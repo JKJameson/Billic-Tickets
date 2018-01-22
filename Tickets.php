@@ -569,6 +569,10 @@ class Tickets {
 				}
 				if (empty($billic->errors)) {
 					$now = time();
+					$serviceid = 0;
+					if (isset($_POST['serviceid'])) {
+						$serviceid = $_POST['serviceid'];
+					}
 					$ticketid = $db->insert('tickets', array(
 						'queue' => 'Support',
 						'userid' => $billic->user['id'],
@@ -578,7 +582,7 @@ class Tickets {
 						'lastreply' => $now,
 						'clientunread' => 1,
 						'adminunread' => 1,
-						'serviceid' => $_POST['serviceid'],
+						'serviceid' => $serviceid,
 						'replypassword' => $billic->rand_str(30) ,
 					));
 					$db->insert('ticketmessages', array(
