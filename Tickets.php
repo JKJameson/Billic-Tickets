@@ -80,7 +80,7 @@ class Tickets {
 				$attachments = explode('|', $message['attachments']);
 				echo '<div style="float:right;text-align:center">';
 				foreach ($attachments as $attachment) {
-					echo '<a href="/User/Tickets/Download/' . urlencode($attachment) . '" target="_blank"><img src="/User/Tickets/Download/' . urlencode($attachment) . '/Thumbnail/120"><br>' . urlencode($attachment) . '</a><br>';
+					echo '<a href="/User/Tickets/Download/' . urlencode($attachment) . '/" target="_blank"><img src="/User/Tickets/Download/' . urlencode($attachment) . '/Thumbnail/120/"><br>' . urlencode($attachment) . '</a><br>';
 				}
 				echo '</div>';
 			}
@@ -301,7 +301,7 @@ class Tickets {
 		if (!file_exists('../attachments/')) {
 			mkdir('../attachments/', 0750);
 			if (!file_exists('../attachments/')) {
-				echo '<br><b>Warning:</b> Billic tried to create the folder at ../attachments/ but failed.<br>';
+				echo '<br><b>Warning:</b> billic tried to create the folder at ../attachments/ but failed.<br>';
 			}
 		}
 		$billic->module('ListManager');
@@ -425,6 +425,12 @@ class Tickets {
 	}
 	function save_draft($ticketid, $message) {
 		global $billic, $db;
+		if (empty(trim($message))) {
+			echo json_encode(array(
+				'status' => 'OK'
+			));
+			exit;
+		}
 		$db->q('UPDATE `tickets_draft` SET `message` = ?, `timestamp` = ? WHERE `ticketid` = ? AND `userid` = ?', $message, time() , $ticketid, $billic->user['id']);
 		if ($db->affected_rows == 0) {
 			$db->insert('tickets_draft', array(
