@@ -298,11 +298,33 @@ class Tickets {
 			$this->reply_box('admin');
 			return;
 		}
-		if (!file_exists('../attachments/')) {
-			mkdir('../attachments/', 0750);
-			if (!file_exists('../attachments/')) {
-				echo '<br><b>Warning:</b> billic tried to create the folder at ../attachments/ but failed.<br>';
+		if (isset($_POST['merge'])) {
+			if (count($_POST['ids'])<2)
+				$billic->errors[] = 'At least two tickets must be selected to merge';
+			$tickets = [];
+			$ticketOwner = false;
+			ksort($_POST['ids']);
+			foreach($_POST['ids'] as $id => $val) {
+				$ticket = $db->q('SELECT `id`, `userid` FROM `tickets` WHERE `id` = ?', $id)[0];
+				if (empty($ticket))
+					$billic->errors[] = 'An invalid ticket was selected';
+				if ($ticketOwner===false)
+					$ticketOwner = $ticket['userid'];
+				if ($ticketOwner!=$ticket['userid'])
+					$billic->errors[] = 'The tickets to merge must belong to the same account';
+				$tickets[] = $ticket;
 			}
+			if (empty($billic->errors)) {
+				// Merge with the first ticket
+				$mergeTo = $tickets[0];
+				unset($tickets[0]);
+				foreach($tickets as $ticket) {
+					//echo 'Merging ticket #'.$ticket['id'].' to '.$mergeTo['id'].'<br>';
+					$db->q('UPDATE `ticketmessages` SET `tid` = ? WHERE `tid` = ?', $mergeTo['id'], $ticket['id']);
+					$db->q('DELETE FROM `tickets` WHERE `id` = ?', $ticket['id']);
+				}
+			}
+				
 		}
 		$billic->module('ListManager');
 		$billic->modules['ListManager']->configure(array(
@@ -385,7 +407,9 @@ class Tickets {
 		if (empty($tickets)) {
 			echo '<p>No Support Tickets matching filter.</p>';
 		} else {
-			echo '<table class="table table-striped"><tr><th>Subject</th><th>Queue</th><th>Priority</th><th>Status</th><th>Client</th><th>Created</th><th>Last Reply</th></tr>';
+			echo '<form method="POST">';
+			echo 'With Selected: <button type="submit" class="btn btn-xs btn-primary" name="merge"><i class="icon-resize-down"></i> Merge</button>';
+			echo '<table class="table table-striped"><tr><th><input type="checkbox" onclick="checkAll(this, \'ids\')" data-enpassusermodified="yes"></th><th>Subject</th><th>Queue</th><th>Priority</th><th>Status</th><th>Client</th><th>Created</th><th>Last Reply</th></tr>';
 			foreach ($tickets as $ticket) {
 				$user_row = $db->q('SELECT `firstname`, `lastname` FROM `users` WHERE `id` = ?', $ticket['userid']);
 				$user_row = $user_row[0];
@@ -399,11 +423,12 @@ class Tickets {
 						$client.= ' <span class="badge badge-blue" title="Tickets of this user awaiting reply">' . $num_tickets_user . '</span>';
 					}
 				}
-				echo '<tr><td><a href="/Admin/Tickets/ID/' . $ticket['id'] . '/">' . ($ticket['adminunread'] == 1 ? '<b>' : '') . htmlentities($ticket['title'], ENT_QUOTES, 'UTF-8') . ($ticket['adminunread'] == 1 ? '</b>' : '') . '</a></td><td>' . $ticket['queue'] . '</td><td>' . $this->calculate_priority(array(
+				echo '<tr><td><input type="checkbox" name="ids['.$ticket['id'].']"></td><td><a href="/Admin/Tickets/ID/' . $ticket['id'] . '/">' . ($ticket['adminunread'] == 1 ? '<b>' : '') . htmlentities($ticket['title'], ENT_QUOTES, 'UTF-8') . ($ticket['adminunread'] == 1 ? '</b>' : '') . '</a></td><td>' . $ticket['queue'] . '</td><td>' . $this->calculate_priority(array(
 					'userid' => $ticket['userid'],
 				)) . '</td><td>' . $this->status_label($ticket['status']) . '</td><td>' . $client . '</td><td>' . $billic->time_ago($ticket['date']) . ' ago</td><td>' . $billic->time_ago($ticket['lastreply']) . ' ago</td></tr>';
 			}
 			echo '</table>';
+			echo '</form>';
 		}
 	}
 	function status_label($status) {
@@ -539,6 +564,12 @@ class Tickets {
 				}
 				$attachments = '';
 				if (empty($billic->errors) && !empty($_FILES['files'])) {
+					if (!file_exists('../attachments/')) {
+						mkdir('../attachments/', 0750);
+						if (!file_exists('../attachments/')) {
+							echo '<br><b>Warning:</b> billic tried to create the folder at ../attachments/ but failed.<br>';
+						}
+					}
 					foreach ($_FILES['files']['tmp_name'] as $key => $tmp_name) {
 						if ($_FILES['files']['error'][$key] != UPLOAD_ERR_OK) {
 							if ($_FILES['files']['error'][$key] != UPLOAD_ERR_NO_FILE) {
@@ -667,6 +698,12 @@ class Tickets {
 				}
 				$attachments = '';
 				if (empty($billic->errors) && !empty($_FILES['files'])) {
+					if (!file_exists('../attachments/')) {
+						mkdir('../attachments/', 0750);
+						if (!file_exists('../attachments/')) {
+							echo '<br><b>Warning:</b> billic tried to create the folder at ../attachments/ but failed.<br>';
+						}
+					}
 					foreach ($_FILES['files']['tmp_name'] as $key => $tmp_name) {
 						if ($_FILES['files']['error'][$key] != UPLOAD_ERR_OK) {
 							if ($_FILES['files']['error'][$key] != UPLOAD_ERR_NO_FILE) {
