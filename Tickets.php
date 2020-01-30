@@ -760,8 +760,7 @@ class Tickets {
 			return;
 		}
 		$billic->set_title('My Support Tickets');
-		echo '<h1><i class="icon-ticket"></i> My Support Tickets</h1>';
-		echo '<p><a href="/User/Tickets/New" class="green"><i class="icon-plus"></i> Click here to open a new ticket</a></p><br>';
+		echo '<a href="/User/Tickets/New" class="btn btn-success pull-right"><i class="icon-plus"></i> Open a New Ticket</a><h1><i class="icon-ticket"></i> My Support Tickets</h1>';
 		$tickets = $db->q('SELECT * FROM `tickets` WHERE `userid` = ? ORDER BY `lastreply` DESC', $billic->user['id']);
 		if (empty($tickets)) {
 			echo '<p>You have no Support Tickets.</p>';
