@@ -450,7 +450,7 @@ class Tickets {
 				if ($ticket['lastreply']!==$ticket['date'])
 					$time .= '<br>Created: '.$billic->time_ago($ticket['date']);
 				$time = str_replace(' ', '&nbsp;', $time);
-				echo '<tr><td><input type="checkbox" name="ids['.$ticket['id'].']"></td><td><a href="/Admin/Tickets/ID/' . $ticket['id'] . '/">' . ($ticket['adminunread'] == 1 ? '<b>' : '') . htmlentities($ticket['title'], ENT_QUOTES, 'UTF-8') . ($ticket['adminunread'] == 1 ? '</b>' : '') . '</a></td><td>' . $ticket['queue'] . '</td><td>' . $this->priority($ticket['userid']) . '</td><td>' . $this->status_label($ticket['status']) . '</td><td>' . $client . '</td><td>'.$time.'</td></tr>';
+				echo '<tr><td><input type="checkbox" name="ids['.$ticket['id'].']"></td><td><a href="/Admin/Tickets/ID/' . $ticket['id'] . '/">' . ($ticket['adminunread'] == 1 ? '<b>' : '') . htmlentities($ticket['title'], ENT_QUOTES, 'UTF-8') . ($ticket['adminunread'] == 1 ? '</b>' : '') . '</a></td><td>' . $ticket['queue'] . '</td><td>' . $this->priority($ticket) . '</td><td>' . $this->status_label($ticket['status']) . '</td><td>' . $client . '</td><td>'.$time.'</td></tr>';
 			}
 			echo '</table>';
 			echo '</form>';
