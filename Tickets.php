@@ -594,21 +594,23 @@ class Tickets {
 			if (empty($_POST['title']) && !empty($_GET['Title'])) {
 				$_POST['title'] = urldecode($_GET['Title']);
 			}
-			if (!in_array($_POST['priority'], $priorities))
-				$billic->errors[] = 'Invalid Priority';
 			if (isset($_POST['message'])) {
 				if (empty($_POST['title'])) {
 					$billic->errors[] = 'Please enter a short summary';
 				}
+				if (!in_array($_POST['priority'], $priorities))
+					$billic->errors[] = 'Invalid Priority';
 				$message = strip_tags($_POST['message'], $this->settings['allowed_tags']);
 				$message = preg_replace('/<([a-z]+)( href\="([a-z0-9\/\:\.\-\_\+\=]+)")?[^>]*>/ims', '<$1$2>', $message);
 				if (empty($message)) {
 					$billic->errors[] = 'Please enter a message';
 				}
 				$successful_uploads = 0;
-				foreach ($_FILES['files']['error'] as $v) {
-					if ($v == UPLOAD_ERR_OK) {
-						$successful_uploads++;
+				if (!empty($_FILES['files'])) {
+					foreach ($_FILES['files']['error'] as $v) {
+						if ($v == UPLOAD_ERR_OK) {
+							$successful_uploads++;
+						}
 					}
 				}
 				if (isset($_POST['min_attachments']) && $_POST['min_attachments'] > $successful_uploads) {
