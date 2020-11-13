@@ -7,7 +7,8 @@ class Tickets {
 		'admin_menu_icon' => '<i class="icon-ticket"></i>',
 		'permissions' => array(
 			'Tickets_New',
-			'Tickets_Close'
+			'Tickets_Close',
+			'Tickets_Delete'
 		) ,
 		'user_menu_name' => 'My Tickets',
 		'user_menu_icon' => '<i class="icon-ticket"></i>',
@@ -127,6 +128,36 @@ class Tickets {
 		));
 		exit;
 	}
+	function merge_tickets($ids) {
+		global $billic, $db;
+		if (!is_array($ids) || count($ids)<2) {
+			$billic->errors[] = 'At least two tickets must be selected to merge';
+			return;	
+		}
+		$tickets = [];
+		$ticketOwner = false;
+		ksort($ids);
+		foreach($ids as $id => $val) {
+			$ticket = $db->q('SELECT `id`, `userid` FROM `tickets` WHERE `id` = ?', $id)[0];
+			if (empty($ticket))
+				$billic->errors[] = 'An invalid ticket was selected';
+			if ($ticketOwner===false)
+				$ticketOwner = $ticket['userid'];
+			if ($ticketOwner!=$ticket['userid'])
+				$billic->errors[] = 'The tickets to merge must belong to the same account';
+			$tickets[] = $ticket;
+		}
+		if (empty($billic->errors)) {
+			// Merge with the first ticket
+			$mergeTo = $tickets[0];
+			unset($tickets[0]);
+			foreach($tickets as $ticket) {
+				//echo 'Merging ticket #'.$ticket['id'].' to '.$mergeTo['id'].'<br>';
+				$db->q('UPDATE `ticketmessages` SET `tid` = ? WHERE `tid` = ?', $mergeTo['id'], $ticket['id']);
+				$db->q('DELETE FROM `tickets` WHERE `id` = ?', $ticket['id']);
+			}
+		}
+	}
 	function admin_area() {
 		global $billic, $db;
 		if (isset($_GET['ID'])) {
@@ -159,6 +190,24 @@ class Tickets {
 					$billic->redirect('/Admin/Tickets/');
 				}
 			}
+			if ($_GET['Action'] == 'Delete') {
+				if (!$billic->user_has_permission($billic->user, 'Tickets_Delete')) {
+					err('You do not have permission to delete this ticket');
+				}
+				foreach($db->q('SELECT `attachments` FROM `ticketmessages` WHERE `tid` = ?', $ticket['id']) as $message) {
+					$attachments = explode('|', $message['attachments']);
+					foreach ($attachments as $attachment) {
+						if (empty($attachment))
+							continue;
+						@unlink('../attachments/' . $attachment);
+						if (file_exists('../attachments/' . $attachment))
+							err('Failed to delete ' . $attachment);
+					}
+				}
+				$db->q('DELETE FROM `ticketmessages` WHERE `tid` = ?', $ticket['id']);
+				$db->q('DELETE FROM `tickets` WHERE `id` = ?', $ticket['id']);
+				$billic->redirect('/Admin/Tickets/');
+			}
 			if (isset($_GET['Verify']) && $billic->user_has_permission($billic->user, 'Users_Verify')) {
 				if ($_GET['Verify'] == 0 || $_GET['Verify'] == 1) {
 					$db->q('UPDATE `users` SET `verified` = ? WHERE `id` = ?', $_GET['Verify'], $ticket['userid']);
@@ -188,7 +237,7 @@ class Tickets {
 					}
 				}
 			}
-			echo '<div style="float:right"><a href="/Admin/Tickets/ID/' . $ticket['id'] . '/Action/Close/" class="btn btn-danger" role="button">Close</a></div>';
+			echo '<div style="float:right"><a href="/Admin/Tickets/ID/' . $ticket['id'] . '/Action/Delete/" class="btn btn-danger" role="button" onClick="return confirm(\'Are you sure you want to delete this support ticket?\')">Delete</a> <a href="/Admin/Tickets/ID/' . $ticket['id'] . '/Action/Close/" class="btn btn-danger" role="button">Close</a></div>';
 			echo '<h1>Support Ticket #' . $_GET['ID'] . ' - ' . safe($ticket['title']) . '</h1>';
 			if (!empty($ticket['userid'])) {
 				$user_row = $db->q('SELECT `firstname`, `lastname` FROM `users` WHERE `id` = ?', $ticket['userid']);
@@ -216,9 +265,7 @@ class Tickets {
 	  <th>Status</th>
   </tr>
   <tr>
-	  <td>' . $this->calculate_priority(array(
-				'userid' => $ticket['userid'],
-			)) . '</td>
+	  <td>' . $this->priority($ticket) . '</td>
 	  <td>';
 			if (empty($service)) {
 				echo 'None';
@@ -298,34 +345,8 @@ class Tickets {
 			$this->reply_box('admin');
 			return;
 		}
-		if (isset($_POST['merge'])) {
-			if (count($_POST['ids'])<2)
-				$billic->errors[] = 'At least two tickets must be selected to merge';
-			$tickets = [];
-			$ticketOwner = false;
-			ksort($_POST['ids']);
-			foreach($_POST['ids'] as $id => $val) {
-				$ticket = $db->q('SELECT `id`, `userid` FROM `tickets` WHERE `id` = ?', $id)[0];
-				if (empty($ticket))
-					$billic->errors[] = 'An invalid ticket was selected';
-				if ($ticketOwner===false)
-					$ticketOwner = $ticket['userid'];
-				if ($ticketOwner!=$ticket['userid'])
-					$billic->errors[] = 'The tickets to merge must belong to the same account';
-				$tickets[] = $ticket;
-			}
-			if (empty($billic->errors)) {
-				// Merge with the first ticket
-				$mergeTo = $tickets[0];
-				unset($tickets[0]);
-				foreach($tickets as $ticket) {
-					//echo 'Merging ticket #'.$ticket['id'].' to '.$mergeTo['id'].'<br>';
-					$db->q('UPDATE `ticketmessages` SET `tid` = ? WHERE `tid` = ?', $mergeTo['id'], $ticket['id']);
-					$db->q('DELETE FROM `tickets` WHERE `id` = ?', $ticket['id']);
-				}
-			}
-				
-		}
+		if (isset($_POST['merge']))
+			$this->merge_tickets($_POST['ids']);
 		$billic->module('ListManager');
 		$billic->modules['ListManager']->configure(array(
 			'search' => array(
@@ -409,9 +430,9 @@ class Tickets {
 		} else {
 			echo '<form method="POST">';
 			echo 'With Selected: <button type="submit" class="btn btn-xs btn-primary" name="merge"><i class="icon-resize-down"></i> Merge</button>';
-			echo '<table class="table table-striped"><tr><th><input type="checkbox" onclick="checkAll(this, \'ids\')" data-enpassusermodified="yes"></th><th>Subject</th><th>Queue</th><th>Priority</th><th>Status</th><th>Client</th><th>Created</th><th>Last Reply</th></tr>';
+			echo '<table class="table table-striped"><tr><th><input type="checkbox" onclick="checkAll(this, \'ids\')" data-enpassusermodified="yes"></th><th>Subject</th><th>Queue</th><th>Priority</th><th>Status</th><th>Client</th><th>Time</th></tr>';
 			foreach ($tickets as $ticket) {
-				$user_row = $db->q('SELECT `firstname`, `lastname` FROM `users` WHERE `id` = ?', $ticket['userid']);
+				$user_row = $db->q('SELECT `firstname`, `lastname`, `companyname` FROM `users` WHERE `id` = ?', $ticket['userid']);
 				$user_row = $user_row[0];
 				if (empty($user_row)) {
 					$client = safe(wordwrap($ticket['email'], 25, PHP_EOL, true));
@@ -420,12 +441,16 @@ class Tickets {
 					$num_tickets_user = $db->q('SELECT COUNT(*) FROM `tickets` WHERE `status` != \'Closed\' AND `status` != \'Answered\' AND `userid` = ?', $ticket['userid']);
 					$num_tickets_user = $num_tickets_user[0]['COUNT(*)'];
 					if ($num_tickets_user > 1) {
-						$client.= ' <span class="badge badge-blue" title="Tickets of this user awaiting reply">' . $num_tickets_user . '</span>';
+						$client.= ' <span class="badge badge-secondary" title="Tickets of this user awaiting reply">' . $num_tickets_user . '</span>';
 					}
+					if (!empty($user_row['companyname']))
+						$client .= '<br>' . safe($user_row['companyname']);
 				}
-				echo '<tr><td><input type="checkbox" name="ids['.$ticket['id'].']"></td><td><a href="/Admin/Tickets/ID/' . $ticket['id'] . '/">' . ($ticket['adminunread'] == 1 ? '<b>' : '') . htmlentities($ticket['title'], ENT_QUOTES, 'UTF-8') . ($ticket['adminunread'] == 1 ? '</b>' : '') . '</a></td><td>' . $ticket['queue'] . '</td><td>' . $this->calculate_priority(array(
-					'userid' => $ticket['userid'],
-				)) . '</td><td>' . $this->status_label($ticket['status']) . '</td><td>' . $client . '</td><td>' . $billic->time_ago($ticket['date']) . ' ago</td><td>' . $billic->time_ago($ticket['lastreply']) . ' ago</td></tr>';
+				$time = $billic->time_ago($ticket['lastreply']);
+				if ($ticket['lastreply']!==$ticket['date'])
+					$time .= '<br>Created: '.$billic->time_ago($ticket['date']);
+				$time = str_replace(' ', '&nbsp;', $time);
+				echo '<tr><td><input type="checkbox" name="ids['.$ticket['id'].']"></td><td><a href="/Admin/Tickets/ID/' . $ticket['id'] . '/">' . ($ticket['adminunread'] == 1 ? '<b>' : '') . htmlentities($ticket['title'], ENT_QUOTES, 'UTF-8') . ($ticket['adminunread'] == 1 ? '</b>' : '') . '</a></td><td>' . $ticket['queue'] . '</td><td>' . $this->priority($ticket['userid']) . '</td><td>' . $this->status_label($ticket['status']) . '</td><td>' . $client . '</td><td>'.$time.'</td></tr>';
 			}
 			echo '</table>';
 			echo '</form>';
@@ -435,18 +460,42 @@ class Tickets {
 		switch ($status) {
 			case 'Open':
 			case 'Customer-Reply':
-				return '<span class="label label-danger">Awaiting Reply</span>';
+				return '<span class="label label-primary">Awaiting Reply</span>';
 			break;
 			case 'In Progress':
-				return '<span class="label label-primary">In Progress</span>';
+				return '<span class="label label-success">In Progress</span>';
 			break;
 			case 'Answered':
-				return '<span class="label label-success">Answered</span>';
+				return '<span class="label label-dark">Answered</span>';
+			break;
+			case 'Closed':
+				return '<span class="label label-light">Closed</span>';
 			break;
 			default:
-				return '<span class="label label-default">' . $status . '</span>';
+				return '<span class="label label-warning">' . $status . '</span>';
 			break;
 		}
+	}
+	function priority_label($priority) {
+		if (empty($priority)) $priority = 'Normal';
+		switch ($priority) {
+			case 'Low':
+				return '<span class="label label-dark">'.$priority.'</span>';
+			break;
+			case 'Normal':
+				return '<span class="label label-light">'.$priority.'</span>';
+			break;
+			case 'High':
+				return '<span class="label label-danger">'.$priority.'</span>';
+			break;
+			default:
+				return '<span class="label label-primary">' . $priority . '</span>';
+			break;
+		}
+	}
+	function priority($ticket) {
+		global $billic, $db;
+		return $this->priority_label($ticket['priority']);
 	}
 	function save_draft($ticketid, $message) {
 		global $billic, $db;
@@ -541,9 +590,12 @@ class Tickets {
 		if (isset($_GET['New'])) {
 			$billic->set_title('New Ticket');
 			echo '<h1>New Support Ticket</h1>';
+			$priorities = ['High', 'Normal', 'Low'];
 			if (empty($_POST['title']) && !empty($_GET['Title'])) {
 				$_POST['title'] = urldecode($_GET['Title']);
 			}
+			if (!in_array($_POST['priority'], $priorities))
+				$billic->errors[] = 'Invalid Priority';
 			if (isset($_POST['message'])) {
 				if (empty($_POST['title'])) {
 					$billic->errors[] = 'Please enter a short summary';
@@ -620,7 +672,8 @@ class Tickets {
 						'clientunread' => 1,
 						'adminunread' => 1,
 						'serviceid' => $serviceid,
-						'replypassword' => $billic->rand_str(30) ,
+						'replypassword' => $billic->rand_str(30),
+						'priority' => $_POST['priority'],
 					));
 					$db->insert('ticketmessages', array(
 						'tid' => $ticketid,
@@ -656,11 +709,16 @@ class Tickets {
 				}
 				echo '</select></td></tr>';
 			}
-			echo '<tr><td width="110">Title:</td><td colspan="5"><input type="text" class="form-control" name="title" id="title" value="' . addslashes($_POST['title']) . '" maxlength="75"></td></tr>';
+			echo '<tr><td width="110">Title:</td><td colspan="5"><input type="text" class="form-control" name="title" id="title" value="' . safe($_POST['title']) . '" maxlength="75"></td></tr>';
+			echo '<tr><td width="110">Priority:</td><td colspan="5"><select class="form-control" name="priority" id="priority">';
+			if (empty($_POST['priority'])) $_POST['priority'] = 'Normal';
+			foreach($priorities as $priority)
+				echo '<option value="'.$priority.'"'.($priority==$_POST['priority']?' selected':'').'>'.$priority.'</option>';
+			echo '</select></td></tr>';
 			$this->reply_box('newticket');
-			//<td>SSH/RDP Port:<br>(if applicable)</td><td><input type="text" class="form-control" name="connport" value="'.addslashes($_POST['port']).'" autocomplete="off"></td>
-			//<td>Root/Admin User:<br>(if applicable)</td><td><input type="text" class="form-control" name="loginuser" value="'.addslashes($_POST['user']).'" autocomplete="off"></td>
-			//<td>Root/Admin Pass:<br>(if applicable)</td><td><input type="password" class="form-control" name="loginpass" value="'.addslashes($_POST['pass']).'" autocomplete="off"></td></tr>
+			//<td>SSH/RDP Port:<br>(if applicable)</td><td><input type="text" class="form-control" name="connport" value="'.safe($_POST['port']).'" autocomplete="off"></td>
+			//<td>Root/Admin User:<br>(if applicable)</td><td><input type="text" class="form-control" name="loginuser" value="'.safe($_POST['user']).'" autocomplete="off"></td>
+			//<td>Root/Admin Pass:<br>(if applicable)</td><td><input type="password" class="form-control" name="loginpass" value="'.safe($_POST['pass']).'" autocomplete="off"></td></tr>
 			echo '</table></form>';
 			return;
 		}
@@ -911,22 +969,6 @@ addLoadEvent(function() {
 		      }
 		*/
 	}
-	function calculate_priority($array) {
-		global $billic, $db;
-		//$priority = rand(0, 2);
-		$priority = 1;
-		switch ($priority) {
-			case 0:
-				return '<span class="label label-info">Low</span>';
-			break;
-			case 1:
-				return '<span class="label label-primary">Normal</span>';
-			break;
-			case 2:
-				return '<span class="label label-danger">Urgent</span>';
-			break;
-		}
-	}
 	function settings($array) {
 		global $billic, $db;
 		if (empty($_POST['update'])) {
@@ -946,14 +988,18 @@ addLoadEvent(function() {
 	}
 	function users_submodule($array) {
 		global $billic, $db;
-		echo '<table class="table table-striped"><tr><th>Ticket&nbsp;#</th><th>Queue</th><th>Subject</th><th>Status</th><th>Last Updated</th></tr>';
+		echo '<form method="POST" action="/Admin/Tickets/"><input type="hidden" name="billic_ajax_module" value="Tickets">';
+		echo 'With Selected: <button type="submit" class="btn btn-xs btn-primary" name="merge"><i class="icon-resize-down"></i> Merge</button>';
+		echo '<table class="table table-striped"><tr><th><input type="checkbox" onclick="checkAll(this, \'ids\')" data-enpassusermodified="yes"></th><th>Ticket&nbsp;#</th><th>Queue</th><th>Subject</th><th>Priority</th><th>Status</th><th>Last Updated</th></tr>';
 		$tickets = $db->q('SELECT * FROM `tickets` WHERE `userid` = ? ORDER BY `lastreply` DESC', $array['user']['id']);
 		if (empty($tickets)) {
 			echo '<tr><td colspan="20">User has no tickets</td></tr>';
 		}
 		foreach ($tickets as $ticket) {
-			echo '<tr><td><a href="/Admin/Tickets/ID/' . $ticket['id'] . '/">' . $ticket['id'] . '</a></td><td>' . $ticket['queue'] . '</td><td>' . ($ticket['adminunread'] == 1 ? '<b>' : '') . htmlentities($ticket['title']) . ($ticket['clientunread'] == 1 ? '</b>' : '') . '</td><td>' . $ticket['status'] . '</td><td>' . $billic->time_ago($ticket['lastreply']) . ' ago</td></tr>';
+			echo '<tr><td><input type="checkbox" name="ids['.$ticket['id'].']"></td><td><a href="/Admin/Tickets/ID/' . $ticket['id'] . '/">' . $ticket['id'] . '</a></td><td>' . $ticket['queue'] . '</td><td>' . ($ticket['adminunread'] == 1 ? '<b>' : '') . htmlentities($ticket['title']) . ($ticket['clientunread'] == 1 ? '</b>' : '') . '</td><td>' . $this->priority($ticket) . '</td><td>' . $this->status_label($ticket['status']) . '</td><td>' . $billic->time_ago($ticket['lastreply']) . ' ago</td></tr>';
 		}
+		echo '</table>';
+		echo '</form>';
 	}
 	function api() {
 		global $billic, $db;
