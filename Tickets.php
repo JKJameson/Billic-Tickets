@@ -977,7 +977,7 @@ addLoadEvent(function() {
 			echo '<form method="POST"><input type="hidden" name="billic_ajax_module" value="Tickets"><table class="table table-striped">';
 			echo '<tr><th>Setting</th><th>Value</th></tr>';
 			echo '<tr><td>Email Notifications</td><td><textarea name="Tickets_emails" class="form-control">' . safe(get_config('Tickets_emails')) . '</textarea><br>A list of emails to send support ticket notifications to. Place 1 email per line.</td></tr>';
-			echo '<tr><td colspan="2"><inpu type="checkbox" name="Tickets_christmas" value="1"' . (get_config('Tickets_christmas') == 1 ? ' checked' : '') . '> Enable Santa hats over avatars during Christmas holidays?</td></tr>';
+			echo '<tr><td colspan="2"><input type="checkbox" name="Tickets_christmas" value="1"' . (get_config('Tickets_christmas') == 1 ? ' checked' : '') . '> Enable Santa hats over avatars during Christmas holidays?</td></tr>';
 			echo '<tr><td colspan="2" align="center"><input type="submit" class="btn btn-default" name="update" value="Update &raquo;"></td></tr>';
 			echo '</table></form>';
 		} else {
