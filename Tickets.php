@@ -792,7 +792,7 @@ class Tickets {
 				}
 				$attachments = substr($attachments, 0, -1);
 				if (empty($billic->errors)) {
-					$this->insert_reply($ticket, $billic->user, $message, $attachments);
+					$this->insert_reply($ticket, $billic->user, $message, $attachments, 'Customer-Reply');
 				}
 			}
 			$billic->show_errors();
@@ -813,7 +813,7 @@ class Tickets {
 			echo '</table>';
 		}
 	}
-	function insert_reply($ticket, $user, $message, $attachments) {
+	function insert_reply($ticket, $user, $message, $attachments, $status) {
 		global $billic, $db;
 		$now = time();
 		$db->insert('ticketmessages', array(
@@ -823,7 +823,7 @@ class Tickets {
 			'message' => $message,
 			'attachments' => $attachments,
 		));
-		$db->q('UPDATE `tickets` SET `lastreply` = ?, `status` = \'Customer-Reply\', `adminunread` = \'1\' WHERE `id` = ?', $now, $ticket['id']);
+		$db->q('UPDATE `tickets` SET `lastreply` = ?, `status` = ?, `adminunread` = \'1\' WHERE `id` = ?', $now, $status, $ticket['id']);
 		$db->q('DELETE FROM `tickets_draft` WHERE `ticketid` = ? AND `userid` = ?', $ticketid, $user['id']);
 		$url = 'http' . (get_config('billic_ssl') ? 's' : '') . '://' . get_config('billic_domain') . '/Admin/Tickets/ID/' . $ticket['id'] . '/';
 		$emails = get_config('Tickets_emails');
@@ -832,7 +832,10 @@ class Tickets {
 			$email = trim($email);
 			if (empty($email))
 				continue;
-			$billic->email($email, 'Support Ticket #' . $ticket['id'] . ' Reply Notification', $user['firstname'] . ' ' . $user['lastname'] . ' has replied.<br><a href="' . $url . '">' . $url . '</a><br>' . nl2br($message));
+			if ($type==='Open')
+				$billic->email($email, 'Support Ticket #' . $ticket['id'] . ' Opened Notification', $user['firstname'] . ' ' . $user['lastname'] . ' has opened a support ticket.<br><a href="' . $url . '">' . $url . '</a><br>' . nl2br($message));
+			else
+				$billic->email($email, 'Support Ticket #' . $ticket['id'] . ' Reply Notification', $user['firstname'] . ' ' . $user['lastname'] . ' has replied.<br><a href="' . $url . '">' . $url . '</a><br>' . nl2br($message));
 		}
 	}
 	function reply_box($mode) {
@@ -1068,10 +1071,13 @@ addLoadEvent(function() {
 				$validTicket = false;
 				if (empty($ticketid)) {
 					// New Ticket
-					if (empty($user['tickets_open_secret']) || stripos($message_full, $user['tickets_open_secret'])!==false)
+					if (empty($user['tickets_open_secret']) || stripos($message_full, $user['tickets_open_secret'])!==false) {
 						$validTicket = true;
+						$message = str_replace($user['tickets_open_secret'], str_repeat('*', strlen($user['tickets_open_secret'])), $message);
+					}
 					
 					if ($validTicket) {
+						$status = 'Open';
 						$now = time();
 						$ticketid = $db->insert('tickets', array(
 							'queue' => ucwords($headerinfo->to[0]->mailbox),
@@ -1086,9 +1092,12 @@ addLoadEvent(function() {
 						$ticket = $db->q('SELECT * FROM `tickets` WHERE `id` = ?', $ticketid)[0];
 					}
 				} else {
+					$status = 'Customer-Reply';
 					$ticket = $db->q('SELECT * FROM `tickets` WHERE `id` = ?', $ticketid)[0];
-					if (!empty($ticket['replypassword']) && stripos($message_full, $ticket['replypassword'])!==false)
+					if (!empty($ticket['replypassword']) && stripos($message_full, $ticket['replypassword'])!==false) {
 						$validTicket = true;
+						$message = str_replace($ticket['replypassword'], str_repeat('*', strlen($ticket['replypassword'])), $message);
+					}
 				}
 				if (!$validTicket) {
 					// TODO: (2) Prevent email auto-responder loop (rate-limit)
@@ -1105,7 +1114,7 @@ addLoadEvent(function() {
 				$attachments = '';
 				// $this->attachments
 				
-				$this->insert_reply($ticket, $user, $message, $attachments);
+				$this->insert_reply($ticket, $user, $message, $attachments, $status);
 				imap_delete($mbox, $overview->msgno);
 				
 			}
