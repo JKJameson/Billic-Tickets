@@ -792,26 +792,7 @@ class Tickets {
 				}
 				$attachments = substr($attachments, 0, -1);
 				if (empty($billic->errors)) {
-					$now = time();
-					$db->insert('ticketmessages', array(
-						'tid' => $ticket['id'],
-						'userid' => $billic->user['id'],
-						'date' => $now,
-						'message' => $message,
-						'attachments' => $attachments,
-					));
-					$db->q('UPDATE `tickets` SET `lastreply` = ?, `status` = \'Customer-Reply\', `adminunread` = \'1\' WHERE `id` = ?', $now, $ticket['id']);
-					$db->q('DELETE FROM `tickets_draft` WHERE `ticketid` = ? AND `userid` = ?', $ticketid, $billic->user['id']);
-					$url = 'http' . (get_config('billic_ssl') ? 's' : '') . '://' . $_SERVER['HTTP_HOST'] . '/Admin/Tickets/ID/' . $ticket['id'] . '/';
-					$emails = get_config('Tickets_emails');
-					$emails = explode(PHP_EOL, $emails);
-					foreach ($emails as $email) {
-						$email = trim($email);
-						if (empty($email)) {
-							continue;
-						}
-						$billic->email($email, 'Support Ticket #' . $ticket['id'] . ' Reply Notification', $billic->user['firstname'] . ' ' . $billic->user['lastname'] . ' has replied.<br><a href="' . $url . '">' . $url . '</a><br>' . $message);
-					}
+					$this->insert_reply($ticket, $billic->user, $message, $attachments);
 				}
 			}
 			$billic->show_errors();
@@ -830,6 +811,28 @@ class Tickets {
 				echo '<tr><td><a href="/User/Tickets/ID/' . $ticket['id'] . '/">' . ($ticket['clientunread'] == 1 ? '<b>' : '') . htmlentities($ticket['title']) . ($ticket['clientunread'] == 1 ? '</b>' : '') . '</a></td><td>' . $ticket['queue'] . '</td><td>' . $this->status_label($ticket['status']) . '</td><td>' . $billic->time_ago($ticket['lastreply']) . ' ago</td></tr>';
 			}
 			echo '</table>';
+		}
+	}
+	function insert_reply($ticket, $user, $message, $attachments) {
+		global $billic, $db;
+		$now = time();
+		$db->insert('ticketmessages', array(
+			'tid' => $ticket['id'],
+			'userid' => $user['id'],
+			'date' => $now,
+			'message' => $message,
+			'attachments' => $attachments,
+		));
+		$db->q('UPDATE `tickets` SET `lastreply` = ?, `status` = \'Customer-Reply\', `adminunread` = \'1\' WHERE `id` = ?', $now, $ticket['id']);
+		$db->q('DELETE FROM `tickets_draft` WHERE `ticketid` = ? AND `userid` = ?', $ticketid, $user['id']);
+		$url = 'http' . (get_config('billic_ssl') ? 's' : '') . '://' . get_config('billic_domain') . '/Admin/Tickets/ID/' . $ticket['id'] . '/';
+		$emails = get_config('Tickets_emails');
+		$emails = explode(PHP_EOL, $emails);
+		foreach ($emails as $email) {
+			$email = trim($email);
+			if (empty($email))
+				continue;
+			$billic->email($email, 'Support Ticket #' . $ticket['id'] . ' Reply Notification', $user['firstname'] . ' ' . $user['lastname'] . ' has replied.<br><a href="' . $url . '">' . $url . '</a><br>' . nl2br($message));
 		}
 	}
 	function reply_box($mode) {
@@ -978,16 +981,191 @@ addLoadEvent(function() {
 			echo '<tr><th>Setting</th><th>Value</th></tr>';
 			echo '<tr><td>Email Notifications</td><td><textarea name="Tickets_emails" class="form-control">' . safe(get_config('Tickets_emails')) . '</textarea><br>A list of emails to send support ticket notifications to. Place 1 email per line.</td></tr>';
 			echo '<tr><td colspan="2"><input type="checkbox" name="Tickets_christmas" value="1"' . (get_config('Tickets_christmas') == 1 ? ' checked' : '') . '> Enable Santa hats over avatars during Christmas holidays?</td></tr>';
+			echo '<tr><th colspan="2">IMAP Details</th></tr>';
+			echo '<tr><td>Host</td><td><input type="text" class="form-control" name="Tickets_IMAP_Host" value="'.safe(get_config('Tickets_IMAP_Host')).'"></td></tr>';
+			echo '<tr><td>User</td><td><input type="text" class="form-control" name="Tickets_IMAP_User" value="'.safe(get_config('Tickets_IMAP_User')).'"></td></tr>';
+			echo '<tr><td>Pass</td><td><input type="text" class="form-control" name="Tickets_IMAP_Pass" value="'.safe(str_repeat('*', strlen($billic->decrypt(get_config('Tickets_IMAP_Pass'))))).'"></td></tr>';
+			echo '<tr><td>Forward Invalid to</td><td><input type="text" class="form-control" name="Tickets_IMAP_InvalidTo" value="'.safe(get_config('Tickets_IMAP_InvalidTo')).'"></td></tr>';
 			echo '<tr><td colspan="2" align="center"><input type="submit" class="btn btn-default" name="update" value="Update &raquo;"></td></tr>';
 			echo '</table></form>';
 		} else {
 			if (empty($billic->errors)) {
 				set_config('Tickets_emails', $_POST['Tickets_emails']);
 				set_config('Tickets_christmas', $_POST['Tickets_christmas']);
+				set_config('Tickets_IMAP_Host', $_POST['Tickets_IMAP_Host']);
+				set_config('Tickets_IMAP_User', $_POST['Tickets_IMAP_User']);
+				if ($_POST['Tickets_IMAP_Pass']!==str_repeat('*', strlen($_POST['Tickets_IMAP_Pass'])))
+					set_config('Tickets_IMAP_Pass', $billic->encrypt($_POST['Tickets_IMAP_Pass']));
+				set_config('Tickets_IMAP_InvalidTo', $_POST['Tickets_IMAP_InvalidTo']);
 				$billic->status = 'updated';
 			}
 		}
 	}
+	function cron() {
+		global $billic, $db;
+		$host = get_config('Tickets_IMAP_Host');
+		if (empty($host)) return;
+		$host = '{'.$host.':993/imap/ssl}';
+		$user = get_config('Tickets_IMAP_User');
+		$pass = $billic->decrypt(get_config('Tickets_IMAP_Pass'));
+		$mbox = imap_open($host, $user, $pass, 0, 1);
+		if (!$mbox) {
+			echo 'Error connecting to IMAP server';
+        		return;
+		}
+		$folders = imap_list($mbox, $host, "*");
+		//array_unshift($folders, 'inbox');
+		foreach($folders as $folder) {
+			if (stripos($folder, 'inbox')===false && stripos($folder, 'spam')===false && stripos($folder, 'junk')===false) continue;
+			imap_reopen($mbox, $folder);
+			$MC = imap_check($mbox);
+			$result = imap_fetch_overview($mbox, "1:{$MC->Nmsgs}", 0);
+			foreach ($result as $overview) {
+				$this->htmlmsg = '';
+				$this->plainmsg = '';
+				$this->charset = '';
+				$this->attachments = '';
+				
+				$headerinfo = imap_headerinfo($mbox, $overview->msgno);
+                                $sender_email = $headerinfo->sender[0]->mailbox.'@'.$headerinfo->sender[0]->host;
+				$subject = trim(imap_utf8($overview->subject));
+				
+				// Parse email structure
+				$s = imap_fetchstructure($mbox, $overview->msgno);
+				if (!$s->parts) { // simple
+					$this->getpart($mbox, $overview->msgno, $s, 0);
+				} else {
+					foreach ($s->parts as $partno0=>$p)
+						$this->getpart($mbox, $overview->msgno, $p, $partno0+1);
+				}
+				
+				$message = trim($this->plainmsg);
+                                if (empty($message))
+                                        $message = trim(strip_tags(imap_utf8($this->htmlmsg)));
+			
+				// remove quotes...
+				$message_full = $message;
+				$message = preg_replace('#(^\w.+:\n)?(^>.*(\n|$))+#mi', '', $message);
+				// On 11/14/20 3:39 AM, XXXXX XXXXXX wrote:
+				$message = preg_replace('~^On ([a-z0-9/\-:, ]+?), (.*?) wrote:~im', '', $message);
+				$message = trim($message);
+				
+				var_dump($message);
+				
+				preg_match('~Ticket #([0-9]+)~', $subject, $ticketid);
+				$ticketid = $ticketid[1];
+				
+				$user = $db->q('SELECT * FROM `users` WHERE `email` = ?', $sender_email)[0];
+				if (empty($user)) {
+					// TODO: Prevent email auto-responder loop (rate-limit)
+					// TODO: Email back saying they are not a registered user
+					
+					$sendTo = get_config('Tickets_IMAP_InvalidTo');
+					if (!empty($sendTo)) mail($sendTo, "FW: $subject", $message);
+					echo "TODO: Delete mail (1)";
+					//imap_delete($mbox, $overview->msgno);
+					continue;
+				}
+				
+				// TODO: New Ticket
+				
+				$validTicket = false;
+				if (!empty($ticketid)) {
+					$ticket = $db->q('SELECT * FROM `tickets` WHERE `id` = ?', $ticketid)[0];
+					if (!empty($ticket['replypassword']) && stripos($message_full, $ticket['replypassword'])!==false)
+						$validTicket = true;
+				}
+				if (!$validTicket) {
+					// TODO: (2) Prevent email auto-responder loop (rate-limit)
+					// TODO: Email the user saying they need to include the full ticket reply
+					
+					$sendTo = get_config('Tickets_IMAP_InvalidTo');
+					if (!empty($sendTo)) mail($sendTo, "FW: $subject", $message);
+					echo "TODO: Delete mail (2)";
+					//imap_delete($mbox, $overview->msgno);
+					continue;
+				}
+				
+				// TODO: Save attachments
+				$attachments = '';
+				// $this->attachments
+				
+				$this->insert_reply($ticket, $user, $message, $attachments);
+				imap_delete($mbox, $overview->msgno);
+				
+			}
+		}
+		imap_expunge($mbox);
+		imap_close($mbox);
+	}
+	
+        private $htmlmsg;
+        private $plainmsg;
+        private $charset;
+        private $attachments = [];
+        function getpart($mbox,$mid,$p,$partno) {
+		// $partno = '1', '2', '2.1', '2.1.3', etc for multipart, 0 if simple
+
+		// DECODE DATA
+		$data = ($partno)?
+		    imap_fetchbody($mbox,$mid,$partno):  // multipart
+		    imap_body($mbox,$mid);  // simple
+		// Any part may be encoded, even plain text messages, so check everything.
+		if ($p->encoding==4)
+		    $data = quoted_printable_decode($data);
+		elseif ($p->encoding==3)
+		    $data = base64_decode($data);
+
+		// PARAMETERS
+		// get all parameters, like charset, filenames of attachments, etc.
+		$params = array();
+		if ($p->parameters)
+		    foreach ($p->parameters as $x)
+			$params[strtolower($x->attribute)] = $x->value;
+		if ($p->dparameters)
+		    foreach ($p->dparameters as $x)
+			$params[strtolower($x->attribute)] = $x->value;
+
+		// ATTACHMENT
+		// Any part with a filename is an attachment,
+		// so an attached text file (type 0) is not mistaken as the message.
+		if ($params['filename'] || $params['name']) {
+		    // filename may be given as 'Filename' or 'Name' or both
+		    $filename = ($params['filename'])? $params['filename'] : $params['name'];
+
+			   // filename may be given as 'Filename' or 'Name' or both
+		    $filename = ($params['filename'])? $params['filename'] : $params['name'];
+		    // filename may be encoded, so see imap_mime_header_decode()
+		    $this->attachments[$filename] = $data;  // this is a problem if two files have same name
+		}
+
+		// TEXT
+		if ($p->type==0 && $data) {
+		    // Messages may be split in different parts because of inline attachments,
+		    // so append parts together with blank row.
+		    if (strtolower($p->subtype)=='plain')
+			$this->plainmsg .= trim($data) ."\n\n";
+		    else
+			$this->htmlmsg .= $data ."<br><br>";
+		    $this->charset = $params['charset'];  // assume all parts are same charset
+		}
+
+		// EMBEDDED MESSAGE
+		// Many bounce notifications embed the original message as type 2,
+		// but AOL uses type 1 (multipart), which is not handled here.
+		// There are no PHP functions to parse embedded messages,
+		// so this just appends the raw source to the main message.
+		elseif ($p->type==2 && $data) {
+		    $this->plainmsg .= $data."\n\n";
+		}
+
+		// SUBPART RECURSION
+		if ($p->parts) {
+		    foreach ($p->parts as $partno0=>$p2)
+			$this->getpart($mbox,$mid,$p2,$partno.'.'.($partno0+1));  // 1.2, 1.2.1, etc.
+		}
+	}		
+		
 	function users_submodule($array) {
 		global $billic, $db;
 		echo '<form method="POST" action="/Admin/Tickets/"><input type="hidden" name="billic_ajax_module" value="Tickets">';
