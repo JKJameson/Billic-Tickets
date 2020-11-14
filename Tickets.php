@@ -1050,8 +1050,6 @@ addLoadEvent(function() {
 				$message = preg_replace('~^On ([a-z0-9/\-:, ]+?), (.*?) wrote:~im', '', $message);
 				$message = trim($message);
 				
-				var_dump($message);
-				
 				preg_match('~Ticket #([0-9]+)~', $subject, $ticketid);
 				$ticketid = $ticketid[1];
 				
@@ -1067,17 +1065,34 @@ addLoadEvent(function() {
 					continue;
 				}
 				
-				// TODO: New Ticket
-				
 				$validTicket = false;
-				if (!empty($ticketid)) {
+				if (empty($ticketid)) {
+					// New Ticket
+					if (empty($user['tickets_open_secret']) || stripos($message_full, $user['tickets_open_secret'])!==false)
+						$validTicket = true;
+					
+					if ($validTicket) {
+						$now = time();
+						$ticketid = $db->insert('tickets', array(
+							'queue' => ucwords($headerinfo->to[0]->mailbox),
+							'userid' => $user['id'],
+							'date' => $now,
+							'title' => $subject,
+							'status' => 'Open',
+							'lastreply' => $now,
+							'clientunread' => 1,
+							'adminunread' => 1,
+						));
+						$ticket = $db->q('SELECT * FROM `tickets` WHERE `id` = ?', $ticketid)[0];
+					}
+				} else {
 					$ticket = $db->q('SELECT * FROM `tickets` WHERE `id` = ?', $ticketid)[0];
 					if (!empty($ticket['replypassword']) && stripos($message_full, $ticket['replypassword'])!==false)
 						$validTicket = true;
 				}
 				if (!$validTicket) {
 					// TODO: (2) Prevent email auto-responder loop (rate-limit)
-					// TODO: Email the user saying they need to include the full ticket reply
+					// TODO: Email the user saying they need to include the full ticket reply, or for new ticket include their secret
 					
 					$sendTo = get_config('Tickets_IMAP_InvalidTo');
 					if (!empty($sendTo)) mail($sendTo, "FW: $subject", $message);
