@@ -336,7 +336,7 @@ class Tickets {
 					$db->q('DELETE FROM `tickets_draft` WHERE `ticketid` = ? AND `userid` = ?', $ticket['id'], $billic->user['id']);
 					$user_row = $db->q('SELECT `firstname`, `lastname`, `email` FROM `users` WHERE `id` = ?', $ticket['userid']);
 					$user_row = $user_row[0];
-					$billic->email($user_row['email'], 'Ticket #' . $ticket['id'] . ' - ' . safe($ticket['title']) , 'Dear ' . $user_row['firstname'] . ' ' . $user_row['lastname'] . ',<br>A response has been made to your ticket.<br><br>' . $message . '<br><br><hr><br><a href="http' . (get_config('billic_ssl') == 1 ? 's' : '') . '://' . get_config('billic_domain') . '/User/Tickets/ID/' . $ticket['id'] . '/">http' . (get_config('billic_ssl') == 1 ? 's' : '') . '://' . get_config('billic_domain') . '/User/Tickets/ID/' . $ticket['id'] . '/</a><br>' . $ticket['replypassword']);
+					$billic->email($user_row['email'], 'Ticket #' . $ticket['id'] . ' - ' . safe($ticket['title']) , $message . '<br><br><hr><br><a href="http' . (get_config('billic_ssl') == 1 ? 's' : '') . '://' . get_config('billic_domain') . '/User/Tickets/ID/' . $ticket['id'] . '/">http' . (get_config('billic_ssl') == 1 ? 's' : '') . '://' . get_config('billic_domain') . '/User/Tickets/ID/' . $ticket['id'] . '/</a><br><span style="display:none">Reply Secret: ' . $ticket['replypassword'].'</span>');
 					$billic->redirect('/Admin/Tickets/');
 				}
 			}
@@ -1031,6 +1031,11 @@ addLoadEvent(function() {
 				
 				$headerinfo = imap_headerinfo($mbox, $overview->msgno);
                                 $sender_email = $headerinfo->sender[0]->mailbox.'@'.$headerinfo->sender[0]->host;
+				if ($headerinfo->to[0]->mailbox==='noreply') {
+					imap_delete($mbox, $overview->msgno);
+					continue;
+				}
+				$queue = ucwords($headerinfo->to[0]->mailbox);
 				$subject = trim(imap_utf8($overview->subject));
 				
 				// Parse email structure
@@ -1058,13 +1063,11 @@ addLoadEvent(function() {
 				
 				$user = $db->q('SELECT * FROM `users` WHERE `email` = ?', $sender_email)[0];
 				if (empty($user)) {
-					// TODO: Prevent email auto-responder loop (rate-limit)
-					// TODO: Email back saying they are not a registered user
+					$billic->email($sender_email, "[Error] You are not registered (email rejected)", "Your message has been rejected.<br><br>You ({$sender_email}) must be a registered user to email our support system.", ['noreply'=>true]);
 					
 					$sendTo = get_config('Tickets_IMAP_InvalidTo');
-					if (!empty($sendTo)) mail($sendTo, "FW: $subject", $message);
-					echo "TODO: Delete mail (1)";
-					//imap_delete($mbox, $overview->msgno);
+					if (!empty($sendTo)) $billic->email($sendTo, "[No User] [$queue] FW: $subject", $message, ['noreply'=>true,'replyto'=>$sender_email]);
+					imap_delete($mbox, $overview->msgno);
 					continue;
 				}
 				
@@ -1080,7 +1083,7 @@ addLoadEvent(function() {
 						$status = 'Open';
 						$now = time();
 						$ticketid = $db->insert('tickets', array(
-							'queue' => ucwords($headerinfo->to[0]->mailbox),
+							'queue' => $queue,
 							'userid' => $user['id'],
 							'date' => $now,
 							'title' => $subject,
@@ -1100,13 +1103,11 @@ addLoadEvent(function() {
 					}
 				}
 				if (!$validTicket) {
-					// TODO: (2) Prevent email auto-responder loop (rate-limit)
-					// TODO: Email the user saying they need to include the full ticket reply, or for new ticket include their secret
+					$billic->email($sender_email, "[Error] Invalid authorization (email rejected)", "Your message has been rejected.<br><br>Your email did not include your secret passphrase to reply to this ticket.<br><br>If you are replying to an email you received from us, please include the full original email in your reply.<br><br>If you continue to get this message, please use our website to respond to your ticket.", ['noreply'=>true]);
 					
 					$sendTo = get_config('Tickets_IMAP_InvalidTo');
-					if (!empty($sendTo)) mail($sendTo, "FW: $subject", $message);
-					echo "TODO: Delete mail (2)";
-					//imap_delete($mbox, $overview->msgno);
+					if (!empty($sendTo)) $billic->email($sendTo, "[No Auth] [$queue] FW: $subject", $message, ['noreply'=>true,'replyto'=>$sender_email]);
+					imap_delete($mbox, $overview->msgno);
 					continue;
 				}
 				
