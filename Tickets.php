@@ -1091,6 +1091,7 @@ addLoadEvent(function() {
 							'lastreply' => $now,
 							'clientunread' => 1,
 							'adminunread' => 1,
+							'replypassword' => $billic->rand_str(30),
 						));
 						$ticket = $db->q('SELECT * FROM `tickets` WHERE `id` = ?', $ticketid)[0];
 					}
@@ -1114,6 +1115,8 @@ addLoadEvent(function() {
 				// TODO: Save attachments
 				$attachments = '';
 				// $this->attachments
+				
+				$billic->email($sender_email, 'Your message has been accepted', 'Your message has been accepted into our support system.<br>We will reply as soon as possible.<br><br><hr><b>Your Message</b><br>'.nl2br($message).'<br><br><hr><br><a href="http' . (get_config('billic_ssl') == 1 ? 's' : '') . '://' . get_config('billic_domain') . '/User/Tickets/ID/' . $ticket['id'] . '/">http' . (get_config('billic_ssl') == 1 ? 's' : '') . '://' . get_config('billic_domain') . '/User/Tickets/ID/' . $ticket['id'] . '/</a>', ['noreply'=>true]);
 				
 				$this->insert_reply($ticket, $user, $message, $attachments, $status);
 				imap_delete($mbox, $overview->msgno);
