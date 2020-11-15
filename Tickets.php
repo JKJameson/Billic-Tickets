@@ -1083,7 +1083,7 @@ addLoadEvent(function() {
 						$status = 'Open';
 						$now = time();
 						$ticketid = $db->insert('tickets', array(
-							'queue' => $queue,
+							'queue' => safe($queue),
 							'userid' => $user['id'],
 							'date' => $now,
 							'title' => $subject,
