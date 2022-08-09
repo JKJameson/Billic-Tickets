@@ -651,19 +651,18 @@ class Tickets {
 					}
 				}
 				$attachments = substr($attachments, 0, -1);
+				$serviceid = 0;
 				if (!empty($_POST['serviceid'])) {
-					$serviceid = $db->q('SELECT * FROM `services` WHERE `userid` = ? AND `id` = ?', $billic->user['id'], $_POST['serviceid']);
+					$serviceid = $db->q('SELECT `id` FROM `services` WHERE `userid` = ? AND `id` = ?', $billic->user['id'], $_POST['serviceid']);
 					$serviceid = $serviceid[0];
 					if (empty($serviceid)) {
-						$_POST['serviceid'] = '';
+						$serviceid = 0;
+					} else {
+						$serviceid = $serviceid['id'];	
 					}
 				}
 				if (empty($billic->errors)) {
 					$now = time();
-					$serviceid = 0;
-					if (isset($_POST['serviceid'])) {
-						$serviceid = $_POST['serviceid'];
-					}
 					$ticketid = $db->insert('tickets', array(
 						'queue' => 'Support',
 						'userid' => $billic->user['id'],
