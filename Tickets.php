@@ -1011,17 +1011,19 @@ addLoadEvent(function() {
 		$host = '{'.$host.':993/imap/ssl}';
 		$user = get_config('Tickets_IMAP_User');
 		$pass = $billic->decrypt(get_config('Tickets_IMAP_Pass'));
-		$mbox = imap_open($host, $user, $pass, 0, 1);
+		$mbox = imap_open($host, $user, $pass, OP_HALFOPEN, 1);
 		if (!$mbox) {
 			echo 'Error connecting to IMAP server';
         		return;
 		}
+
 		$folders = imap_list($mbox, $host, "*");
 		//array_unshift($folders, 'inbox');
 		foreach($folders as $folder) {
 			if (stripos($folder, 'inbox')===false && stripos($folder, 'spam')===false && stripos($folder, 'junk')===false) continue;
-			imap_reopen($mbox, $folder);
+			imap_reopen($mbox, $folder, OP_EXPUNGE | CL_EXPUNGE);
 			$MC = imap_check($mbox);
+			echo "There are {$MC->Nmsgs} messages in $folder\n";
 			$result = imap_fetch_overview($mbox, "1:{$MC->Nmsgs}", 0);
 			foreach ($result as $overview) {
 				$this->htmlmsg = '';
@@ -1063,7 +1065,8 @@ addLoadEvent(function() {
 				
 				$user = $db->q('SELECT * FROM `users` WHERE `email` = ?', $sender_email)[0];
 				if (empty($user)) {
-					$billic->email($sender_email, "[Error] You are not registered (email rejected)", "Your message has been rejected.<br><br>You ({$sender_email}) must be a registered user to email our support system.", ['noreply'=>true]);
+					// TODO: Ignore email loops
+					//$billic->email($sender_email, "[Error] You are not registered (email rejected)", "Your message has been rejected.<br><br>You ({$sender_email}) must be a registered user to email our support system.", ['noreply'=>true]);
 					
 					$sendTo = get_config('Tickets_IMAP_InvalidTo');
 					if (!empty($sendTo)) $billic->email($sendTo, "[No User] [$queue] FW: $subject", $message, ['noreply'=>true,'replyto'=>$sender_email]);
@@ -1116,14 +1119,14 @@ addLoadEvent(function() {
 				$attachments = '';
 				// $this->attachments
 				
-				$billic->email($sender_email, 'Your message has been accepted', 'Your message has been accepted into our support system.<br>We will reply as soon as possible.<br><br><hr><b>Your Message</b><br>'.nl2br($message).'<br><br><hr><br><a href="http' . (get_config('billic_ssl') == 1 ? 's' : '') . '://' . get_config('billic_domain') . '/User/Tickets/ID/' . $ticket['id'] . '/">http' . (get_config('billic_ssl') == 1 ? 's' : '') . '://' . get_config('billic_domain') . '/User/Tickets/ID/' . $ticket['id'] . '/</a>', ['noreply'=>true]);
+				$billic->email($sender_email, 'Your message has been accepted', 'Your message has been accepted into our support system. We will reply as soon as possible.<br><br><hr><b>Your Message</b><br>'.nl2br($message).'<br><br><hr><br><a href="http' . (get_config('billic_ssl') == 1 ? 's' : '') . '://' . get_config('billic_domain') . '/User/Tickets/ID/' . $ticket['id'] . '/">http' . (get_config('billic_ssl') == 1 ? 's' : '') . '://' . get_config('billic_domain') . '/User/Tickets/ID/' . $ticket['id'] . '/</a>', ['noreply'=>true]);
 				
 				$this->insert_reply($ticket, $user, $message, $attachments, $status);
 				imap_delete($mbox, $overview->msgno);
 				
 			}
+			imap_expunge($mbox);
 		}
-		imap_expunge($mbox);
 		imap_close($mbox);
 	}
 	
