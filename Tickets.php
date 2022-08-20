@@ -337,6 +337,13 @@ class Tickets {
 					$user_row = $db->q('SELECT `firstname`, `lastname`, `email` FROM `users` WHERE `id` = ?', $ticket['userid']);
 					$user_row = $user_row[0];
 					$billic->email($user_row['email'], 'Ticket #' . $ticket['id'] . ' - ' . safe($ticket['title']) , $message . '<br><br><hr><br><a href="http' . (get_config('billic_ssl') == 1 ? 's' : '') . '://' . get_config('billic_domain') . '/User/Tickets/ID/' . $ticket['id'] . '/">http' . (get_config('billic_ssl') == 1 ? 's' : '') . '://' . get_config('billic_domain') . '/User/Tickets/ID/' . $ticket['id'] . '/</a><br><span style="display:none">Reply Secret: ' . $ticket['replypassword'].'</span>');
+
+					$billic->module_call_functions('tickets_reply', array(
+						'userid' => $billic->user['id'],
+						'ticketid' => $ticket['id'],
+						'message' => $message,
+					));
+
 					$billic->redirect('/Admin/Tickets/');
 				}
 			}
@@ -694,6 +701,11 @@ class Tickets {
 						}
 						$billic->email($email, 'Support Ticket #' . $ticketid . ' Opened Notification', $billic->user['firstname'] . ' ' . $billic->user['lastname'] . ' has opened a support ticket.<br><a href="' . $url . '">' . $url . '</a><br>' . $message);
 					}
+					$billic->module_call_functions('tickets_reply', array(
+						'userid' => $billic->user['id'],
+						'ticketid' => $ticketid,
+						'message' => $message,
+					));
 					$billic->redirect('/User/Tickets/ID/' . $ticketid . '/');
 				}
 			}
@@ -836,6 +848,11 @@ class Tickets {
 			else
 				$billic->email($email, 'Support Ticket #' . $ticket['id'] . ' Reply Notification', $user['firstname'] . ' ' . $user['lastname'] . ' has replied.<br><a href="' . $url . '">' . $url . '</a><br>' . nl2br($message));
 		}
+		$billic->module_call_functions('tickets_reply', array(
+			'userid' => $billic->user['id'],
+			'ticketid' => $ticket['id'],
+			'message' => $message,
+		));
 	}
 	function reply_box($mode) {
 		global $billic, $db;
