@@ -591,7 +591,7 @@ class Tickets {
 			readfile($src);
 			exit;
 		}
-		if ($_GET['Action'] == 'CheckReply') {
+		if (isset($_GET['Action']) && $_GET['Action'] == 'CheckReply') {
 			$this->check_reply($ticket);
 		}
 		if (isset($_GET['New'])) {
@@ -722,11 +722,11 @@ class Tickets {
 				}
 				echo '</select></td></tr>';
 			}
-			echo '<tr><td width="110">Title:</td><td colspan="5"><input type="text" class="form-control" name="title" id="title" value="' . safe($_POST['title']) . '" maxlength="75"></td></tr>';
+			$title = (isset($_POST['title'])?safe($_POST['title']):'');
+			$priority = (isset($_POST['priority'])?safe($_POST['priority']):'Normal');
+			echo '<tr><td width="110">Title:</td><td colspan="5"><input type="text" class="form-control" name="title" id="title" value="' . safe($title) . '" maxlength="75"></td></tr>';
 			echo '<tr><td width="110">Priority:</td><td colspan="5"><select class="form-control" name="priority" id="priority">';
-			if (empty($_POST['priority'])) $_POST['priority'] = 'Normal';
-			foreach($priorities as $priority)
-				echo '<option value="'.$priority.'"'.($priority==$_POST['priority']?' selected':'').'>'.$priority.'</option>';
+			foreach($priorities as $p) echo '<option value="'.$p.'"'.($p==$priority?' selected':'').'>'.$p.'</option>';
 			echo '</select></td></tr>';
 			$this->reply_box('newticket');
 			//<td>SSH/RDP Port:<br>(if applicable)</td><td><input type="text" class="form-control" name="connport" value="'.safe($_POST['port']).'" autocomplete="off"></td>
@@ -741,7 +741,7 @@ class Tickets {
 			if (empty($ticket)) {
 				err("Ticket " . $_GET['ID'] . " does not exist");
 			}
-			if ($_GET['Action'] == 'SaveDraft') {
+			if (isset($_GET['Action']) && $_GET['Action'] == 'SaveDraft') {
 				$billic->disable_content();
 				$this->save_draft($ticket['id'], $_POST['message']);
 				exit;
@@ -872,11 +872,9 @@ class Tickets {
 			//echo '<div class="alert alert-danger alert-dismissible" role="alert"><button type="button" class="close" data-dismiss="alert" aria-label="Close"><span aria-hidden="true">&times;</span></button><strong>Warning! Josh Jameson </strong> is currently replying to this ticket.</div>';
 			echo '<form method="POST" id="replyForm" enctype="multipart/form-data"><table class="table table-striped" id="attachTable"><tr><th colspan="2">' . $title . '</th></tr>';
 		}
-		$draft = $db->q('SELECT `message` FROM `tickets_draft` WHERE `ticketid` = ? AND `userid` = ?', $_GET['ID'], $billic->user['id']);
-		$draft = $draft[0]['message'];
-		if (!empty($draft)) {
-			$_POST['message'] = $draft;
-		}
+		$ticketID = (isset($_GET['ID'])?safe($_GET['ID']):'');
+		$draft = $db->q('SELECT `message` FROM `tickets_draft` WHERE `ticketid` = ? AND `userid` = ?', $ticketID, $billic->user['id']);
+		if (!empty($draft)) $_POST['message'] = $draft[0]['message'];
 		echo '<tr><td colspan="2"><textarea name="message" id="ticket_message" style="width:99%; height:100px">' . (empty($_POST['message']) ? $billic->user['signature'] : htmlentities($_POST['message'], ENT_QUOTES, 'UTF-8')) . '</textarea></td></tr>';
 		echo '<tr><td colspan="2"><button type="button" class="btn btn-info" onClick="ticket_add_attachment()" style="float:right"><i class="icon-paperclip"></i> Add an attachment</button><div class="input-group">';
 		if ($mode == 'admin') {
